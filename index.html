@@ -224,6 +224,13 @@ tbody td{padding:8px 10px;white-space:nowrap;}
 .arb-pair-result{font-family:var(--head);font-size:15px;font-weight:700;text-align:right;}
 .arb-pair-spread{font-size:9px;color:var(--muted);}
 .arb-pair-pips{display:inline-block;font-size:9px;font-family:var(--mono);background:rgba(168,85,247,.15);color:var(--accent3);border:1px solid rgba(168,85,247,.3);padding:1px 6px;border-radius:8px;margin-left:4px;letter-spacing:.5px;}
+.day-group{border-bottom:1px solid var(--border);}
+.day-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--s2);border-bottom:1px solid var(--border2);position:sticky;top:0;z-index:5;}
+.day-title{font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:.5px;}
+.day-stats{font-size:10px;color:var(--muted);font-family:var(--mono);}
+.day-stats .green{color:var(--accent);font-weight:700;} .day-stats .red{color:var(--red);font-weight:700;}
+.src-tag{display:inline-block;font-size:8px;background:var(--s3);color:var(--muted2);padding:1px 5px;border-radius:6px;border:1px solid var(--border2);margin-right:4px;font-family:var(--mono);}
+.bonus-banner{font-size:10px;color:var(--muted2);background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.5;}
 .arb-period-summary{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:12px;}
 .arb-period-title{font-size:10px;color:var(--accent2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:700;}
 .arb-period-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
@@ -393,6 +400,15 @@ tbody td{padding:8px 10px;white-space:nowrap;}
       <label>Auto-backup diário (download)</label>
       <select id="auto-bk"><option value="off">Desativado</option><option value="on">Ativado</option></select>
     </div>
+    <div style="font-size:11px;color:var(--accent2);margin-top:18px;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">🔧 Manutenção de Dados</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+      Ferramentas para corrigir dados antigos importados incorretamente.
+    </div>
+    <button class="btn btn-b" style="margin-bottom:6px" onclick="fixLotsByHundred()">🔧 Dividir lotes ÷100 (conta atual)</button>
+    <div style="font-size:9px;color:var(--muted2);margin-bottom:8px;line-height:1.4">Use se você importou ops com lotes 100× maiores (ex: 10.0 ao invés de 0.10). Recalcula spread depois.</div>
+    <button class="btn btn-p" style="margin-bottom:6px" onclick="recalcAllSpreads()">🔄 Recalcular spread de TODAS as ops (conta atual)</button>
+    <div style="font-size:9px;color:var(--muted2);margin-bottom:8px;line-height:1.4">Reaplica o spreadConfig em todas as operações já importadas.</div>
+
     <div class="danger-zone">
       <div style="font-size:10px;color:var(--red);margin-bottom:8px;letter-spacing:1px">⚠ ZONA PERIGOSA</div>
       <button class="btn btn-red" onclick="resetAll()">APAGAR TUDO</button>
@@ -479,6 +495,16 @@ function loadDB(){
       DB=Object.assign(DB,parsed);
     }
   }catch(e){console.warn('Load failed');}
+  // Migration: ensure each account has depositos/bonus/operacoes/custos/reports arrays
+  if(DB.accounts){
+    DB.accounts.forEach(function(a){
+      if(!Array.isArray(a.depositos)) a.depositos=[];
+      if(!Array.isArray(a.bonus)) a.bonus=[];
+      if(!Array.isArray(a.operacoes)) a.operacoes=[];
+      if(!Array.isArray(a.custos)) a.custos=[];
+      if(!Array.isArray(a.reports)) a.reports=[];
+    });
+  }
 }
 
 // ============================================================
@@ -796,6 +822,41 @@ function renderSpreadList(){
   }).join('');
 }
 
+function fixLotsByHundred(){
+  var a=getAcct(); if(!a){ alert('Selecione uma conta primeiro (não funciona no Geral).'); return; }
+  if(!a.operacoes||a.operacoes.length===0) return alert('Nenhuma operação nesta conta.');
+  var suspect=a.operacoes.filter(function(o){return o.lotes>=5;}).length;
+  if(!confirm('Dividir TODOS os lotes de "'+a.nome+'" por 100?\n\nIsso é útil se o parser importou lotes 100× maiores.\nEx: 10.0 → 0.10, 4.0 → 0.04.\n\n'+a.operacoes.length+' ops serão afetadas. '+suspect+' tem lotes ≥ 5.\n\nConfirmar?')) return;
+  a.operacoes.forEach(function(o){
+    o.lotes=(o.lotes||0)/100;
+    // Recalc spread with new lots
+    var calc=calculateOpSpread(o, a);
+    if(calc>0){ o.spread=calc; o.spreadCalculated=true; }
+  });
+  saveDB();
+  closeModal('modal-settings');
+  renderDashboard();
+  renderHistorico();
+  renderRelatorio();
+  toast('✅ '+a.operacoes.length+' ops com lotes corrigidos');
+}
+
+function recalcAllSpreads(){
+  var a=getAcct(); if(!a){ alert('Selecione uma conta primeiro.'); return; }
+  if(!a.spreadConfig||Object.keys(a.spreadConfig).length===0){ alert('Configure pelo menos um ativo no Spread por Corretora antes.'); return; }
+  if(!confirm('Recalcular spread de TODAS as '+a.operacoes.length+' operações de "'+a.nome+'"?')) return;
+  var updated=0, skipped=0;
+  a.operacoes.forEach(function(op){
+    var calc=calculateOpSpread(op, a);
+    if(calc>0){ op.spread=calc; op.spreadCalculated=true; updated++; } else { skipped++; }
+  });
+  saveDB();
+  closeModal('modal-settings');
+  renderDashboard();
+  renderHistorico();
+  toast('✅ '+updated+' ops recalculadas ('+skipped+' sem config)');
+}
+
 function migrateLegacyPipValue(){
   var a=getCurrentSpreadAcct(); if(!a||!a.spreadConfig) return;
   var migrated=[];
@@ -958,6 +1019,7 @@ function createAccount(){
     numero:document.getElementById('na-numero').value.trim(),
     moeda:document.getElementById('na-moeda').value,
     depositos:dep>0?[{id:uid(),valor:dep,data:today()}]:[],
+    bonus:[],
     operacoes:[], custos:[], reports:[]
   };
   DB.accounts.push(acct);
@@ -1017,14 +1079,18 @@ function renderAcctBar(){
 // ============================================================
 function calcStats(a){
   if(!a) return null;
+  if(!Array.isArray(a.depositos)) a.depositos=[];
+  if(!Array.isArray(a.bonus)) a.bonus=[];
   var totalDep=a.depositos.reduce(function(s,d){return s+d.valor;},0);
+  var totalBonus=a.bonus.reduce(function(s,b){return s+b.valor;},0);
   var totalRes=a.operacoes.reduce(function(s,o){return s+o.resultado;},0);
   var totalSwap=a.operacoes.reduce(function(s,o){return s+(o.swap||0);},0);
   var totalSpread=a.operacoes.reduce(function(s,o){return s+(o.spread||0);},0);
   var totalCustosExtra=a.custos.filter(function(c){return c.obs!=='Auto (relatório)'&&c.obs!=='Auto (op manual)';}).reduce(function(s,c){return s+c.valor;},0);
   var totalCustos=totalSwap+totalSpread+totalCustosExtra;
   var lucroLiq=totalRes;
-  var saldo=totalDep+lucroLiq;
+  var saldo=totalDep+lucroLiq; // saldo NÃO inclui bônus (sacável apenas após volume)
+  var saldoComBonus=saldo+totalBonus;
   var totalLotes=a.operacoes.reduce(function(s,o){return s+(o.lotes||0);},0);
   var wins=a.operacoes.filter(function(o){return o.resultado>0;}).length;
   var losses=a.operacoes.filter(function(o){return o.resultado<0;}).length;
@@ -1042,16 +1108,16 @@ function calcStats(a){
     byAsset[o.par].res+=o.resultado;
     if(o.resultado>0) byAsset[o.par].wins++;
   });
-  return {totalDep,totalRes,totalSwap,totalSpread,totalCustos,lucroLiq,saldo,totalLotes,wins,losses,wr,roi,avgWin,avgLoss,rr,count:a.operacoes.length,byAsset};
+  return {totalDep,totalBonus,totalRes,totalSwap,totalSpread,totalCustos,lucroLiq,saldo,saldoComBonus,totalLotes,wins,losses,wr,roi,avgWin,avgLoss,rr,count:a.operacoes.length,byAsset};
 }
 
 function calcGeralStats(){
-  var totalDep=0,totalRes=0,totalSwap=0,totalSpread=0,totalCustos=0,totalOps=0,totalLotes=0,totalWins=0,totalLosses=0;
+  var totalDep=0,totalBonus=0,totalRes=0,totalSwap=0,totalSpread=0,totalCustos=0,totalOps=0,totalLotes=0,totalWins=0,totalLosses=0;
   var byAcct=[];
   var byAsset={};
   DB.accounts.forEach(function(a){
     var s=calcStats(a);
-    totalDep+=s.totalDep;totalRes+=s.totalRes;totalSwap+=s.totalSwap;totalSpread+=s.totalSpread;
+    totalDep+=s.totalDep;totalBonus+=(s.totalBonus||0);totalRes+=s.totalRes;totalSwap+=s.totalSwap;totalSpread+=s.totalSpread;
     totalCustos+=s.totalCustos;totalOps+=s.count;totalLotes+=s.totalLotes;totalWins+=s.wins;totalLosses+=s.losses;
     byAcct.push({acct:a,stats:s});
     Object.keys(s.byAsset).forEach(function(p){
@@ -1063,9 +1129,10 @@ function calcGeralStats(){
     });
   });
   var saldo=totalDep+totalRes;
+  var saldoComBonus=saldo+totalBonus;
   var wr=totalOps>0?(totalWins/totalOps*100):0;
   var roi=totalDep>0?(totalRes/totalDep*100):0;
-  return {totalDep,totalRes,totalSwap,totalSpread,totalCustos,saldo,totalLotes,totalWins,totalLosses,totalOps,wr,roi,byAcct,byAsset};
+  return {totalDep,totalBonus,totalRes,totalSwap,totalSpread,totalCustos,saldo,saldoComBonus,totalLotes,totalWins,totalLosses,totalOps,wr,roi,byAcct,byAsset};
 }
 
 // ============================================================
@@ -1128,9 +1195,11 @@ function renderDashboard(){
     <div class="kpi-grid">
       <div class="kpi c-blue"><div class="kpi-label">Saldo</div><div class="kpi-val blue">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">Dep: $${s.totalDep.toFixed(2)}</div></div>
       <div class="kpi c-${s.lucroLiq>=0?'green':'red'}"><div class="kpi-label">Resultado</div><div class="kpi-val ${s.lucroLiq>=0?'green':'red'}">${fmtS(s.lucroLiq)}</div><div class="kpi-sub">ROI: ${fmtP(s.roi)}</div></div>
+      <div class="kpi c-purple"><div class="kpi-label">💳 Bônus</div><div class="kpi-val purple">$${(s.totalBonus||0).toFixed(2)}</div><div class="kpi-sub">${a.bonus.length} crédito(s)</div></div>
       <div class="kpi c-yellow"><div class="kpi-label">Lotes</div><div class="kpi-val yellow">${s.totalLotes.toFixed(2)}</div><div class="kpi-sub">${s.count} ops</div></div>
       <div class="kpi c-red"><div class="kpi-label">Custos</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">Spread+Swap</div></div>
     </div>
+    ${s.totalBonus>0?'<div class="bonus-banner">💡 <strong>Saldo c/ bônus:</strong> $'+s.saldoComBonus.toFixed(2)+' • <strong>Sem bônus (sacável):</strong> $'+s.saldo.toFixed(2)+' • Bônus geralmente exige bater volume mínimo antes do saque.</div>':''}
     <div class="sec">
       <div class="sec-head"><span class="sec-title">Performance</span><div style="display:flex;gap:6px;align-items:center"><span class="sec-badge">${a.corretora||'Conta'}</span><button class="spread-mini-btn" onclick="openSpreadModal('${a.id}')" title="Configurar Spread">📏</button></div></div>
       <div class="sec-body">
@@ -1159,11 +1228,57 @@ function renderDashboard(){
         </div>
         <button class="btn btn-g" onclick="addDeposito()">+ DEPÓSITO</button>
         <div style="margin-top:10px">
-          ${a.depositos.slice().reverse().map(function(d){return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:10px"><span style="color:var(--muted2)">'+d.data+'</span><span style="color:var(--accent)">+$'+d.valor.toFixed(2)+'</span></div>';}).join('')||'<div class="empty" style="padding:12px 0">Nenhum depósito.</div>'}
+          ${a.depositos.slice().reverse().map(function(d){
+            var tag=d.source==='ai-parser'?'<span class="src-tag">🤖 IA</span>':d.source==='local-parser'?'<span class="src-tag">⚡ Local</span>':'<span class="src-tag">✋ Manual</span>';
+            var desc=d.descricao?' • '+d.descricao:'';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:10px;gap:8px"><span style="color:var(--muted2);flex-shrink:0">'+d.data+'</span><span style="color:var(--muted);font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tag+desc+'</span><span style="color:var(--accent);flex-shrink:0">+$'+d.valor.toFixed(2)+'</span></div>';
+          }).join('')||'<div class="empty" style="padding:12px 0">Nenhum depósito.</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">💳 Crédito / Bônus</span><span class="sec-badge">${a.bonus.length}</span></div>
+      <div class="sec-body">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+          Bônus extraídos automaticamente do daily (deals tipo <code>credit</code>). Não somam no saldo sacável.
+        </div>
+        <div class="fgrid">
+          <div class="fg"><label>Valor ($)</label><input type="number" id="bonus-val" placeholder="50"></div>
+          <div class="fg"><label>Data</label><input type="date" id="bonus-dt" value="${today()}"></div>
+        </div>
+        <input id="bonus-desc" placeholder="Descrição (ex: Welcome Bonus)" style="margin-bottom:6px">
+        <button class="btn btn-p" onclick="addBonus()">+ BÔNUS</button>
+        <div style="margin-top:10px">
+          ${a.bonus.slice().reverse().map(function(b){
+            var tag=b.source==='ai-parser'?'<span class="src-tag">🤖 IA</span>':b.source==='local-parser'?'<span class="src-tag">⚡ Local</span>':'<span class="src-tag">✋ Manual</span>';
+            var desc=b.descricao?' • '+b.descricao:'';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:10px;gap:8px"><span style="color:var(--muted2);flex-shrink:0">'+b.data+'</span><span style="color:var(--muted);font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tag+desc+'</span><span style="color:var(--accent3);flex-shrink:0">+$'+b.valor.toFixed(2)+' <button class="spread-mini-btn" onclick="deleteBonus(\''+b.id+'\')" style="margin-left:4px">✕</button></span></div>';
+          }).join('')||'<div class="empty" style="padding:12px 0">Nenhum bônus.</div>'}
         </div>
       </div>
     </div>
   `;
+}
+
+function addBonus(){
+  var a=getAcct(); if(!a) return;
+  var v=parseFloat(document.getElementById('bonus-val').value); if(!v||isNaN(v)) return alert('Valor inválido');
+  var dt=document.getElementById('bonus-dt').value||today();
+  var desc=document.getElementById('bonus-desc').value.trim();
+  if(!Array.isArray(a.bonus)) a.bonus=[];
+  a.bonus.push({id:uid(),valor:v,data:dt,descricao:desc||'Manual',source:'manual'});
+  saveDB();
+  renderDashboard();
+  toast('💳 Bônus registrado');
+}
+
+function deleteBonus(id){
+  var a=getAcct(); if(!a||!Array.isArray(a.bonus)) return;
+  if(!confirm('Remover este bônus?')) return;
+  a.bonus=a.bonus.filter(function(b){return b.id!==id;});
+  saveDB();
+  renderDashboard();
+  toast('🗑 Bônus removido');
 }
 
 function renderGeralDashboard(pane){
@@ -1174,6 +1289,7 @@ function renderGeralDashboard(pane){
       <div class="kpi c-purple"><div class="kpi-label">🌐 Saldo Total</div><div class="kpi-val purple">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">${DB.accounts.length} contas</div></div>
       <div class="kpi c-${s.totalRes>=0?'green':'red'}"><div class="kpi-label">Resultado Total</div><div class="kpi-val ${s.totalRes>=0?'green':'red'}">${fmtS(s.totalRes)}</div><div class="kpi-sub">ROI: ${fmtP(s.roi)}</div></div>
       <div class="kpi c-blue"><div class="kpi-label">Capital Investido</div><div class="kpi-val blue">$${s.totalDep.toFixed(2)}</div><div class="kpi-sub">Soma depósitos</div></div>
+      <div class="kpi c-purple"><div class="kpi-label">💳 Bônus Total</div><div class="kpi-val purple">$${(s.totalBonus||0).toFixed(2)}</div><div class="kpi-sub">Não sacável direto</div></div>
       <div class="kpi c-yellow"><div class="kpi-label">Total Lotes</div><div class="kpi-val yellow">${s.totalLotes.toFixed(2)}</div><div class="kpi-sub">${s.totalOps} ops</div></div>
       <div class="kpi c-red"><div class="kpi-label">Custos Totais</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">Swap+Spread</div></div>
       <div class="kpi c-green"><div class="kpi-label">Win Rate Geral</div><div class="kpi-val green">${s.wr.toFixed(1)}%</div><div class="kpi-sub">W:${s.totalWins} L:${s.totalLosses}</div></div>
@@ -1875,6 +1991,45 @@ function localParseReport(text){
   return ops;
 }
 
+// Extract balance (deposits/withdrawals) and credit (bonus) deals from raw daily text.
+// Handles PuPrime/MT5 deal-table format. Returns {deposits:[], credits:[]}.
+function localParseBalanceAndCredit(text){
+  var deposits=[], credits=[];
+  if(!text) return {deposits:deposits,credits:credits};
+  var seen={};
+  // Match: YYYY.MM.DD HH:MM:SS  DEALID  (balance|credit)  ... DESCRIPTION ... AMOUNT
+  // Heuristic: line starts with date, contains "balance" or "credit" as standalone token
+  var lines=text.split(/\r?\n/);
+  var dateRe=/^(\d{4}[.\-/]\d{2}[.\-/]\d{2})/;
+  lines.forEach(function(line){
+    if(!/\b(balance|credit)\b/i.test(line)) return;
+    var dm=line.match(dateRe); if(!dm) return;
+    var date=dm[1].replace(/[.\-/]/g,'-');
+    // tokens separated by 2+ spaces or tabs
+    var parts=line.split(/\t+|\s{2,}/).filter(function(t){return t.trim().length>0;});
+    if(parts.length<4) return;
+    // find dealId (numeric, after the date/time)
+    var dealId=null;
+    for(var i=0;i<parts.length;i++){
+      if(/^\d{6,}$/.test(parts[i])){dealId=parts[i];break;}
+    }
+    var type=/\bcredit\b/i.test(line)?'credit':'balance';
+    // amount: last numeric value in the line (may be -X.XX or X.XX)
+    var amountMatch=line.match(/(-?\d+[,.]\d{2})\s*$/);
+    if(!amountMatch) return;
+    var amount=parseFloat(amountMatch[1].replace(',','.'));
+    if(isNaN(amount)||amount===0) return;
+    // description: token containing "-" like "Deposit-USDT" or "Credit In-Welcome"
+    var descMatch=line.match(/([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]*)?\-[A-Za-z0-9()\-_.]+)/);
+    var descricao=descMatch?descMatch[1]:type;
+    var key=(dealId||(date+'_'+amount+'_'+type));
+    if(seen[key]) return; seen[key]=true;
+    var entry={dealId:dealId,valor:amount,data:date,descricao:descricao};
+    if(type==='credit') credits.push(entry); else deposits.push(entry);
+  });
+  return {deposits:deposits,credits:credits};
+}
+
 function parseLocalDateTime(str){
   // Format: "12/05/26, 11:28:26" or "12/05/2026, 11:28:26"
   var m=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?\s+(\d{1,2}:\d{2}:\d{2})/);
@@ -1952,12 +2107,31 @@ async function parseReport(){
     var totalPnl=localOps.reduce(function(s,o){return s+o.resultado;},0);
     var wins=localOps.filter(function(o){return o.resultado>0;}).length;
     summary='Parser local: '+localOps.length+' ops processadas (P&L $'+totalPnl.toFixed(2)+', '+wins+'W/'+(localOps.length-wins)+'L)';
-    
+
+    // Extract deposits + credits (dedup by dealId)
+    var bc=localParseBalanceAndCredit(text);
+    var depAddedL=0, bonusAddedL=0;
+    if(!a.depositos) a.depositos=[]; if(!a.bonus) a.bonus=[];
+    bc.deposits.forEach(function(d){
+      var did=d.dealId?String(d.dealId):null;
+      if(did&&a.depositos.some(function(x){return x.dealId===did;})) return;
+      a.depositos.push({id:uid(),dealId:did,valor:d.valor,data:d.data,descricao:d.descricao,source:'local-parser'});
+      depAddedL++;
+    });
+    bc.credits.forEach(function(c){
+      var did=c.dealId?String(c.dealId):null;
+      if(did&&a.bonus.some(function(x){return x.dealId===did;})) return;
+      a.bonus.push({id:uid(),dealId:did,valor:c.valor,data:c.data,descricao:c.descricao,source:'local-parser'});
+      bonusAddedL++;
+    });
+
     a.reports.push({
       id:uid(),
       importedAt:new Date().toLocaleString('pt-BR'),
       opsAdded:newCount,
       opsUpdated:updateCount,
+      depositsAdded:depAddedL,
+      creditsAdded:bonusAddedL,
       totalProfit:totalPnl,
       summary:summary,
       raw:text.slice(0,200),
@@ -2017,25 +2191,47 @@ CAMPOS POSSÍVEIS NO TEXTO (varia por broker):
 - "Hora de abertura" / "Open Time" — formato BR pode ser "12/05/26, 11:28:26" (DD/MM/YY)
 - "Hora de fecho" / "Close Time"
 
+EXTRAIA TAMBÉM transações não-trade (DEALS do tipo balance/credit/withdrawal):
+- "balance" + comment "Deposit-*" → depósito real (POSITIVO)
+- "balance" + comment "Withdrawal-*" → saque (NEGATIVO, preserve sinal)
+- "credit" + comment "Credit In-*" / "Bonus-*" / "Welcome*" → BÔNUS/CRÉDITO (POSITIVO)
+- "credit" + comment "Credit Out-*" → REMOÇÃO de bônus (NEGATIVO)
+
 RETORNE APENAS JSON puro, sem markdown:
 {
   "date": "YYYY-MM-DD",
   "newOperations": [
     {
-      "ticketId": "217136783",
+      "ticketId": "312287469",
       "par": "XAUUSD",
       "tipo": "BUY",
-      "lotes": 4,
-      "entrada": "4686.38",
-      "saida": "4664.67",
-      "resultado": -86.84,
+      "lotes": 0.04,
+      "entrada": "4640.51",
+      "saida": "4638.87",
+      "resultado": -6.60,
       "swap": 0,
       "spread": 0,
-      "data": "2026-05-12",
-      "openTime": "2026-05-12 11:28:26",
-      "closeTime": "2026-05-12 12:12:11",
-      "durationSec": 2625,
-      "closeReason": "Stop out"
+      "data": "2026-05-01",
+      "openTime": "2026-05-01 19:29:10",
+      "closeTime": "2026-05-01 20:17:17",
+      "durationSec": 2887,
+      "closeReason": "closePosition"
+    }
+  ],
+  "deposits": [
+    {
+      "dealId": "308117547",
+      "valor": 119.00,
+      "data": "2026-05-01",
+      "descricao": "Deposit-USDT(BEP20)-CPS"
+    }
+  ],
+  "credits": [
+    {
+      "dealId": "308117550",
+      "valor": 60.00,
+      "data": "2026-05-01",
+      "descricao": "Credit In-Welcome5020"
     }
   ],
   "updates": [],
@@ -2050,7 +2246,16 @@ REGRAS CRÍTICAS:
 5. Se ticketId já existe na base, coloque em "updates" não em "newOperations"
 6. Calcule durationSec subtraindo openTime - closeTime
 7. swap deve ser POSITIVO (custo)
-8. "entrada" = preço de abertura (open price), "saida" = preço de fechamento. SEM vírgula como separador de milhar (4500.00 não 4,500.00)`;
+8. "entrada" = preço de abertura (open price), "saida" = preço de fechamento. SEM vírgula como separador de milhar (4500.00 não 4,500.00)
+9. deposits e credits: use o "Ticket" da linha do Deal como "dealId" (não o ticket da Order). Se nao tiver deals balance/credit, retorne arrays vazios.
+10. Ignore deals do tipo "in"/"out" que ja sao parte de uma operacao normal (têm Item/Symbol preenchido). Só extraia em deposits/credits quando NÃO há instrumento (Item vazio).
+11. ⚠ LOTES (Size/Volume): NUNCA multiplique por 100, NUNCA arredonde. Preserve EXATAMENTE como está no relatório.
+    - "0.04 / 0.04" → lotes = 0.04 (use o PRIMEIRO número antes da barra)
+    - "0.10" → lotes = 0.10 (mantém zero antes da vírgula como ".10" ou "0.10")
+    - "1.50" → lotes = 1.50
+    - Se o número aparece como "4" mas é uma op de XAU com profit ~$6 e move de 1.6 pontos, é provavelmente 0.04 (não 4). Ops de XAUUSD acima de 5 lotes são RARAS — desconfie se ver "4" sem decimal.
+12. ticketId: use o ticket da linha de ORDER (não da Deal). Ex: 312287469 (Order), não 308118122 (Deal).
+13. Use o Deal "out" (closePosition) para preencher saida e resultado. Use o Order line para entrada e openTime.`;
 
   try{
     var aiUrl=DB.aiApiUrl||(location.origin+'/api/ai');
@@ -2132,11 +2337,36 @@ REGRAS CRÍTICAS:
       });
     }
 
+    // Auto-extract deposits (dedup by dealId)
+    var depAdded=0, bonusAdded=0;
+    if(Array.isArray(parsed.deposits)){
+      if(!a.depositos) a.depositos=[];
+      parsed.deposits.forEach(function(d){
+        var v=parseFloat(d.valor); if(!v||isNaN(v)) return;
+        var did=d.dealId?String(d.dealId):null;
+        if(did&&a.depositos.some(function(x){return x.dealId===did;})) return;
+        a.depositos.push({id:uid(),dealId:did,valor:v,data:d.data||today(),descricao:d.descricao||'Auto (IA)',source:'ai-parser'});
+        depAdded++;
+      });
+    }
+    if(Array.isArray(parsed.credits)){
+      if(!a.bonus) a.bonus=[];
+      parsed.credits.forEach(function(c){
+        var v=parseFloat(c.valor); if(!v||isNaN(v)) return;
+        var did=c.dealId?String(c.dealId):null;
+        if(did&&a.bonus.some(function(x){return x.dealId===did;})) return;
+        a.bonus.push({id:uid(),dealId:did,valor:v,data:c.data||today(),descricao:c.descricao||'Auto (IA)',source:'ai-parser'});
+        bonusAdded++;
+      });
+    }
+
     a.reports.push({
       id:uid(),
       importedAt:new Date().toLocaleString('pt-BR'),
       opsAdded:newCount,
       opsUpdated:updateCount,
+      depositsAdded:depAdded,
+      creditsAdded:bonusAdded,
       totalProfit:parsed.totalProfit||0,
       summary:parsed.summary||'Processado via IA.',
       raw:text.slice(0,200),
@@ -2146,6 +2376,8 @@ REGRAS CRÍTICAS:
     saveDB();
     var msg='✅ <span style="color:var(--accent)">'+newCount+' novas</span>';
     if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
+    if(depAdded>0) msg+=' | <span style="color:var(--accent)">+'+depAdded+' depósito(s)</span>';
+    if(bonusAdded>0) msg+=' | <span style="color:var(--accent3)">+'+bonusAdded+' bônus</span>';
     msg+=' <span style="color:var(--muted2)">(IA)</span>';
     status.innerHTML=msg;
 
@@ -2156,7 +2388,11 @@ REGRAS CRÍTICAS:
     renderDashboard();
     renderHistorico();
     renderCustos();
-    toast('🤖 '+newCount+' novas + '+updateCount+' atualizadas');
+    if(typeof renderCredito==='function') renderCredito();
+    var toastMsg='🤖 '+newCount+' ops';
+    if(depAdded>0) toastMsg+=' + '+depAdded+' dep';
+    if(bonusAdded>0) toastMsg+=' + '+bonusAdded+' bônus';
+    toast(toastMsg);
 
   }catch(e){
     console.error(e);
@@ -2171,22 +2407,62 @@ REGRAS CRÍTICAS:
 function renderHistorico(){
   var a=getAcct(); if(!a) return;
   var pane=document.getElementById('pane-historico'); if(!pane) return;
+
+  if(a.operacoes.length===0){
+    pane.innerHTML='<div class="sec"><div class="sec-head"><span class="sec-title">📋 Histórico de Operações</span></div><div class="sec-body"><div class="empty"><div class="icon">📋</div>Nenhuma operação. Use a aba <strong>Relatório</strong> para importar via IA.</div></div></div>';
+    return;
+  }
+
+  // Group by date (descending)
+  var byDate={};
+  a.operacoes.forEach(function(o){
+    var d=o.data||'sem-data';
+    if(!byDate[d]) byDate[d]=[];
+    byDate[d].push(o);
+  });
+  var dates=Object.keys(byDate).sort(function(x,y){return y.localeCompare(x);});
+
+  var groupsHtml=dates.map(function(date){
+    var ops=byDate[date].slice().sort(function(x,y){
+      var tx=x.openTime||x.data, ty=y.openTime||y.data;
+      return ty.localeCompare(tx);
+    });
+    var dayResult=ops.reduce(function(s,o){return s+o.resultado;},0);
+    var dayLotes=ops.reduce(function(s,o){return s+(o.lotes||0);},0);
+    var dayWins=ops.filter(function(o){return o.resultado>0;}).length;
+    var dayWR=ops.length>0?(dayWins/ops.length*100):0;
+    var dateLabel=date;
+    try{
+      var dt=new Date(date+'T00:00:00');
+      var dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      if(!isNaN(dt.getTime())) dateLabel=dias[dt.getDay()]+', '+dt.toLocaleDateString('pt-BR');
+    }catch(e){}
+
+    var rowsHtml=ops.map(function(o){
+      var hora=o.openTime?o.openTime.split(' ')[1]||'—':'—';
+      var dur=formatDuration(o.durationSec);
+      var slipStr='—';
+      if(o.slippage!=null){
+        slipStr=(o.slippage>0?'+':'')+o.slippage.toFixed(1)+'p';
+      }
+      return '<tr onclick="openEditOp(\''+o.id+'\')"><td style="color:var(--muted2)">'+hora+'</td><td>'+dur+'</td><td style="font-weight:700;color:var(--text)">'+o.par+'</td><td><span class="tag '+(o.tipo==='BUY'?'tag-buy':'tag-sell')+'">'+o.tipo+'</span></td><td>'+o.lotes.toFixed(2)+'</td><td style="color:'+(o.resultado>=0?'var(--accent)':'var(--red)')+'">'+fmtS(o.resultado)+'</td><td style="color:'+(o.slippage>0?'var(--accent)':(o.slippage<0?'var(--red)':'var(--muted)'))+'">'+slipStr+'</td><td style="color:var(--red)">'+(o.swap>0?'-$'+o.swap.toFixed(2):'—')+'</td><td style="color:var(--orange)">'+(o.spread>0?'-$'+o.spread.toFixed(2):'—')+'</td></tr>';
+    }).join('');
+
+    return '<div class="day-group">'
+      +'<div class="day-header">'
+      +'<div class="day-title">📅 '+dateLabel+'</div>'
+      +'<div class="day-stats"><span class="'+(dayResult>=0?'green':'red')+'">'+fmtS(dayResult)+'</span> • '+ops.length+' ops • '+dayLotes.toFixed(2)+' lotes • WR '+dayWR.toFixed(0)+'%</div>'
+      +'</div>'
+      +'<div class="tbl-wrap"><table><thead><tr><th>Hora</th><th>Dur.</th><th>Par</th><th>Tipo</th><th>Lotes</th><th>Resultado</th><th>Slip</th><th>Swap</th><th>Spread</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'
+      +'</div>';
+  }).join('');
+
   pane.innerHTML=`
     <div class="sec">
-      <div class="sec-head"><span class="sec-title">📋 Histórico de Operações</span><span class="sec-badge">${a.operacoes.length} ops</span></div>
+      <div class="sec-head"><span class="sec-title">📋 Histórico por Data</span><span class="sec-badge">${a.operacoes.length} ops • ${dates.length} dia(s)</span></div>
       <div class="sec-body" style="padding:0">
-        ${a.operacoes.length===0?'<div class="empty"><div class="icon">📋</div>Nenhuma operação. Use a aba <strong>Relatório</strong> para importar via IA.</div>':
-        '<div style="font-size:10px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border)">💡 Toque em uma linha para editar/excluir</div>'+
-        '<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Hora</th><th>Duração</th><th>Par</th><th>Tipo</th><th>Lotes</th><th>Resultado</th><th>Slip</th><th>Swap</th><th>Spread</th><th>Origem</th></tr></thead><tbody>'+
-        a.operacoes.slice().reverse().map(function(o){
-          var hora=o.openTime?o.openTime.split(' ')[1]||'—':'—';
-          var dur=formatDuration(o.durationSec);
-          var slipStr='—';
-          if(o.slippage!=null){
-            slipStr=(o.slippage>0?'+':'')+o.slippage.toFixed(1)+'p';
-          }
-          return '<tr onclick="openEditOp(\''+o.id+'\')"><td>'+o.data+'</td><td style="color:var(--muted2)">'+hora+'</td><td>'+dur+'</td><td style="font-weight:700;color:var(--text)">'+o.par+'</td><td><span class="tag '+(o.tipo==='BUY'?'tag-buy':'tag-sell')+'">'+o.tipo+'</span></td><td>'+o.lotes.toFixed(2)+'</td><td style="color:'+(o.resultado>=0?'var(--accent)':'var(--red)')+'">'+fmtS(o.resultado)+'</td><td style="color:'+(o.slippage>0?'var(--accent)':(o.slippage<0?'var(--red)':'var(--muted)'))+'">'+slipStr+'</td><td style="color:var(--red)">'+(o.swap>0?'-$'+o.swap.toFixed(2):'—')+'</td><td style="color:var(--orange)">'+(o.spread>0?'-$'+o.spread.toFixed(2):'—')+'</td><td><span class="tag '+(o.source==='report'?'tag-src':'tag-man')+'">'+(o.source==='report'?'IA':'MAN')+'</span></td></tr>';
-        }).join('')+'</tbody></table></div>'}
+        <div style="font-size:10px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border)">💡 Operações agrupadas por dia. Toque em uma linha para editar/excluir.</div>
+        ${groupsHtml}
       </div>
     </div>
   `;
