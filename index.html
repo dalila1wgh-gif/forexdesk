@@ -67,9 +67,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 .kpi.c-red::before{background:var(--red);}
 .kpi.c-yellow::before{background:var(--yellow);}
 .kpi.c-purple::before{background:var(--accent3);}
+.kpi.c-orange::before{background:var(--orange);}
 .kpi-label{font-size:10px;color:var(--muted2);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;line-height:1.2;}
 .kpi-val{font-family:var(--head);font-size:20px;font-weight:700;line-height:1.1;}
-.green{color:var(--accent);} .red{color:var(--red);} .blue{color:var(--accent2);} .yellow{color:var(--yellow);} .purple{color:var(--accent3);}
+.green{color:var(--accent);} .red{color:var(--red);} .blue{color:var(--accent2);} .yellow{color:var(--yellow);} .purple{color:var(--accent3);} .orange{color:var(--orange);}
 .kpi-sub{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.3;}
 
 .sec{background:var(--s2);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;}
@@ -306,7 +307,8 @@ tbody td{padding:9px 10px;white-space:nowrap;}
   <button class="bnav" onclick="showTab('arbitragem',this)" data-tab="arbitragem"><span class="icon">🔗</span>Arbitragem</button>
   <button class="bnav" onclick="showTab('relatorio',this)" data-tab="relatorio"><span class="icon">📨</span>Relatório</button>
   <button class="bnav" onclick="showTab('historico',this)" data-tab="historico"><span class="icon">📋</span>Histórico</button>
-  <button class="bnav" onclick="showTab('custos',this)" data-tab="custos"><span class="icon">💸</span>Custos</button>
+  <button class="bnav" onclick="showTab('retiradas',this)" data-tab="retiradas"><span class="icon">💸</span>Retiradas</button>
+  <button class="bnav" onclick="showTab('custos',this)" data-tab="custos"><span class="icon">💰</span>Custos</button>
   <button class="bnav" onclick="showTab('ia',this)" data-tab="ia"><span class="icon">🤖</span>IA</button>
 </nav>
 
@@ -500,11 +502,12 @@ function loadDB(){
       DB=Object.assign(DB,parsed);
     }
   }catch(e){console.warn('Load failed');}
-  // Migration: ensure each account has depositos/bonus/operacoes/custos/reports arrays
+  // Migration: ensure each account has depositos/bonus/retiradas/operacoes/custos/reports arrays
   if(DB.accounts){
     DB.accounts.forEach(function(a){
       if(!Array.isArray(a.depositos)) a.depositos=[];
       if(!Array.isArray(a.bonus)) a.bonus=[];
+      if(!Array.isArray(a.retiradas)) a.retiradas=[];
       if(!Array.isArray(a.operacoes)) a.operacoes=[];
       if(!Array.isArray(a.custos)) a.custos=[];
       if(!Array.isArray(a.reports)) a.reports=[];
@@ -1058,6 +1061,7 @@ function createAccount(){
     moeda:document.getElementById('na-moeda').value,
     depositos:dep>0?[{id:uid(),valor:dep,data:today()}]:[],
     bonus:[],
+    retiradas:[],
     operacoes:[], custos:[], reports:[]
   };
   DB.accounts.push(acct);
@@ -1119,21 +1123,29 @@ function calcStats(a){
   if(!a) return null;
   if(!Array.isArray(a.depositos)) a.depositos=[];
   if(!Array.isArray(a.bonus)) a.bonus=[];
+  if(!Array.isArray(a.retiradas)) a.retiradas=[];
   var totalDep=a.depositos.reduce(function(s,d){return s+d.valor;},0);
   var totalBonus=a.bonus.reduce(function(s,b){return s+b.valor;},0);
+  // Retiradas armazenadas como valor POSITIVO (módulo do saque)
+  var totalRetiradas=a.retiradas.reduce(function(s,r){return s+Math.abs(r.valor);},0);
   var totalRes=a.operacoes.reduce(function(s,o){return s+o.resultado;},0);
   var totalSwap=a.operacoes.reduce(function(s,o){return s+(o.swap||0);},0);
   var totalSpread=a.operacoes.reduce(function(s,o){return s+(o.spread||0);},0);
   var totalCustosExtra=a.custos.filter(function(c){return c.obs!=='Auto (relatório)'&&c.obs!=='Auto (op manual)';}).reduce(function(s,c){return s+c.valor;},0);
   var totalCustos=totalSwap+totalSpread+totalCustosExtra;
   var lucroLiq=totalRes;
-  var saldo=totalDep+lucroLiq; // saldo NÃO inclui bônus (sacável apenas após volume)
+  // Capital LÍQUIDO investido = depositado - retirado
+  var capitalLiquido=totalDep-totalRetiradas;
+  // Saldo = depositado - retirado + lucro (NÃO inclui bônus)
+  var saldo=capitalLiquido+lucroLiq;
   var saldoComBonus=saldo+totalBonus;
   var totalLotes=a.operacoes.reduce(function(s,o){return s+(o.lotes||0);},0);
   var wins=a.operacoes.filter(function(o){return o.resultado>0;}).length;
   var losses=a.operacoes.filter(function(o){return o.resultado<0;}).length;
   var wr=a.operacoes.length>0?(wins/a.operacoes.length*100):0;
-  var roi=totalDep>0?(lucroLiq/totalDep*100):0;
+  // ROI usa capital líquido se positivo, senão depósito total como base
+  var roiBase=capitalLiquido>0?capitalLiquido:totalDep;
+  var roi=roiBase>0?(lucroLiq/roiBase*100):0;
   var avgWin=wins>0?a.operacoes.filter(function(o){return o.resultado>0;}).reduce(function(s,o){return s+o.resultado;},0)/wins:0;
   var avgLoss=losses>0?a.operacoes.filter(function(o){return o.resultado<0;}).reduce(function(s,o){return s+o.resultado;},0)/losses:0;
   var rr=avgLoss!==0?Math.abs(avgWin/avgLoss):0;
@@ -1146,16 +1158,17 @@ function calcStats(a){
     byAsset[o.par].res+=o.resultado;
     if(o.resultado>0) byAsset[o.par].wins++;
   });
-  return {totalDep,totalBonus,totalRes,totalSwap,totalSpread,totalCustos,lucroLiq,saldo,saldoComBonus,totalLotes,wins,losses,wr,roi,avgWin,avgLoss,rr,count:a.operacoes.length,byAsset};
+  return {totalDep,totalBonus,totalRetiradas,capitalLiquido,totalRes,totalSwap,totalSpread,totalCustos,lucroLiq,saldo,saldoComBonus,totalLotes,wins,losses,wr,roi,avgWin,avgLoss,rr,count:a.operacoes.length,byAsset};
 }
 
 function calcGeralStats(){
-  var totalDep=0,totalBonus=0,totalRes=0,totalSwap=0,totalSpread=0,totalCustos=0,totalOps=0,totalLotes=0,totalWins=0,totalLosses=0;
+  var totalDep=0,totalBonus=0,totalRetiradas=0,totalRes=0,totalSwap=0,totalSpread=0,totalCustos=0,totalOps=0,totalLotes=0,totalWins=0,totalLosses=0;
   var byAcct=[];
   var byAsset={};
   DB.accounts.forEach(function(a){
     var s=calcStats(a);
-    totalDep+=s.totalDep;totalBonus+=(s.totalBonus||0);totalRes+=s.totalRes;totalSwap+=s.totalSwap;totalSpread+=s.totalSpread;
+    totalDep+=s.totalDep;totalBonus+=(s.totalBonus||0);totalRetiradas+=(s.totalRetiradas||0);
+    totalRes+=s.totalRes;totalSwap+=s.totalSwap;totalSpread+=s.totalSpread;
     totalCustos+=s.totalCustos;totalOps+=s.count;totalLotes+=s.totalLotes;totalWins+=s.wins;totalLosses+=s.losses;
     byAcct.push({acct:a,stats:s});
     Object.keys(s.byAsset).forEach(function(p){
@@ -1166,11 +1179,13 @@ function calcGeralStats(){
       byAsset[p].wins+=s.byAsset[p].wins;
     });
   });
-  var saldo=totalDep+totalRes;
+  var capitalLiquido=totalDep-totalRetiradas;
+  var saldo=capitalLiquido+totalRes;
   var saldoComBonus=saldo+totalBonus;
   var wr=totalOps>0?(totalWins/totalOps*100):0;
-  var roi=totalDep>0?(totalRes/totalDep*100):0;
-  return {totalDep,totalBonus,totalRes,totalSwap,totalSpread,totalCustos,saldo,saldoComBonus,totalLotes,totalWins,totalLosses,totalOps,wr,roi,byAcct,byAsset};
+  var roiBase=capitalLiquido>0?capitalLiquido:totalDep;
+  var roi=roiBase>0?(totalRes/roiBase*100):0;
+  return {totalDep,totalBonus,totalRetiradas,capitalLiquido,totalRes,totalSwap,totalSpread,totalCustos,saldo,saldoComBonus,totalLotes,totalWins,totalLosses,totalOps,wr,roi,byAcct,byAsset};
 }
 
 // ============================================================
@@ -1185,7 +1200,7 @@ function renderMain(){
   if(!DB.activeAcct||(DB.activeAcct!=='__GERAL__'&&!getAcct())){
     DB.activeAcct=DB.accounts[0].id;
   }
-  var panes=['dashboard','periodo','arbitragem','relatorio','historico','custos','ia'];
+  var panes=['dashboard','periodo','arbitragem','relatorio','historico','retiradas','custos','ia'];
   document.getElementById('main-content').innerHTML=panes.map(function(p){
     return '<div id="pane-'+p+'" class="tab-pane'+(p===DB.activeTab?' active':'')+'"></div>';
   }).join('');
@@ -1196,6 +1211,7 @@ function renderMain(){
   }else{
     renderRelatorio();
     renderHistorico();
+    renderRetiradas();
     renderCustos();
   }
   renderIA();
@@ -1231,9 +1247,11 @@ function renderDashboard(){
 
   pane.innerHTML=`
     <div class="kpi-grid">
-      <div class="kpi c-blue"><div class="kpi-label">Saldo</div><div class="kpi-val blue">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">Dep: $${s.totalDep.toFixed(2)}</div></div>
+      <div class="kpi c-blue"><div class="kpi-label">Saldo</div><div class="kpi-val blue">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">Capital líq.: $${s.capitalLiquido.toFixed(2)}</div></div>
       <div class="kpi c-${s.lucroLiq>=0?'green':'red'}"><div class="kpi-label">Resultado</div><div class="kpi-val ${s.lucroLiq>=0?'green':'red'}">${fmtS(s.lucroLiq)}</div><div class="kpi-sub">ROI: ${fmtP(s.roi)}</div></div>
+      <div class="kpi c-blue"><div class="kpi-label">Capital Investido</div><div class="kpi-val blue">$${s.capitalLiquido.toFixed(2)}</div><div class="kpi-sub">Dep $${s.totalDep.toFixed(2)} − Saq $${(s.totalRetiradas||0).toFixed(2)}</div></div>
       <div class="kpi c-purple"><div class="kpi-label">💳 Bônus</div><div class="kpi-val purple">$${(s.totalBonus||0).toFixed(2)}</div><div class="kpi-sub">${a.bonus.length} crédito(s)</div></div>
+      <div class="kpi c-orange"><div class="kpi-label">💸 Retiradas</div><div class="kpi-val orange">$${(s.totalRetiradas||0).toFixed(2)}</div><div class="kpi-sub">${a.retiradas.length} saque(s)</div></div>
       <div class="kpi c-yellow"><div class="kpi-label">Lotes</div><div class="kpi-val yellow">${s.totalLotes.toFixed(2)}</div><div class="kpi-sub">${s.count} ops</div></div>
       <div class="kpi c-red"><div class="kpi-label">Custos</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">Spread+Swap</div></div>
     </div>
@@ -1319,6 +1337,89 @@ function deleteBonus(id){
   toast('🗑 Bônus removido');
 }
 
+// ============================================================
+// RETIRADAS (saques)
+// ============================================================
+function renderRetiradas(){
+  var pane=document.getElementById('pane-retiradas'); if(!pane) return;
+  var a=getAcct(); if(!a) return;
+  if(!Array.isArray(a.retiradas)) a.retiradas=[];
+  var s=calcStats(a);
+
+  // Agrupar por mês
+  var byMonth={};
+  a.retiradas.slice().sort(function(x,y){return (y.data||'').localeCompare(x.data||'');}).forEach(function(r){
+    var mes=(r.data||'').substring(0,7)||'sem-data';
+    if(!byMonth[mes]) byMonth[mes]={total:0,itens:[]};
+    byMonth[mes].total+=Math.abs(r.valor);
+    byMonth[mes].itens.push(r);
+  });
+  var meses=Object.keys(byMonth).sort().reverse();
+
+  pane.innerHTML=`
+    <div class="sync-banner">
+      💸 <strong>Retiradas (saques):</strong> são debitadas do <strong>Capital Investido</strong> e <strong>Saldo</strong>. Extraídas automaticamente do daily report (deals tipo <code>balance</code> com valor negativo / comentário "Withdrawal").
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi c-orange"><div class="kpi-label">Total Sacado</div><div class="kpi-val orange">$${s.totalRetiradas.toFixed(2)}</div><div class="kpi-sub">${a.retiradas.length} saque(s)</div></div>
+      <div class="kpi c-blue"><div class="kpi-label">Depositado</div><div class="kpi-val blue">$${s.totalDep.toFixed(2)}</div><div class="kpi-sub">${a.depositos.length} depósito(s)</div></div>
+      <div class="kpi c-${s.capitalLiquido>=0?'green':'red'}"><div class="kpi-label">Capital Líquido</div><div class="kpi-val ${s.capitalLiquido>=0?'green':'red'}">$${s.capitalLiquido.toFixed(2)}</div><div class="kpi-sub">Dep − Saq</div></div>
+      <div class="kpi c-${s.lucroLiq>=0?'green':'red'}"><div class="kpi-label">Lucro Realizado</div><div class="kpi-val ${s.lucroLiq>=0?'green':'red'}">${fmtS(s.lucroLiq)}</div><div class="kpi-sub">Acumulado</div></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">➕ Adicionar Saque Manual</span></div>
+      <div class="sec-body">
+        <div class="fgrid">
+          <div class="fg"><label>Valor sacado ($)</label><input type="number" step="0.01" id="ret-val" placeholder="100.00"></div>
+          <div class="fg"><label>Data</label><input type="date" id="ret-dt" value="${today()}"></div>
+        </div>
+        <input id="ret-desc" placeholder="Descrição (ex: PIX, Bank Wire, USDT)" style="margin-bottom:6px">
+        <button class="btn btn-p" onclick="addRetirada()">+ REGISTRAR SAQUE</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">📅 Histórico de Saques</span><span class="sec-badge">${a.retiradas.length}</span></div>
+      <div class="sec-body">
+        ${a.retiradas.length===0?'<div class="empty"><div class="icon">💸</div>Nenhum saque registrado.<br><span style="font-size:9px">Quando você enviar um daily com retirada, ela aparece aqui automaticamente.</span></div>':
+        meses.map(function(m){
+          var grupo=byMonth[m];
+          var label=m==='sem-data'?'Sem data':m;
+          return '<div class="day-group"><div class="day-header"><span>📅 '+label+'</span><span class="day-total" style="color:var(--orange,#f59e0b)">−$'+grupo.total.toFixed(2)+' • '+grupo.itens.length+'x</span></div>'+
+            grupo.itens.map(function(r){
+              var tag=r.source==='ai-parser'?'<span class="src-tag">🤖 IA</span>':r.source==='local-parser'?'<span class="src-tag">⚡ Local</span>':r.source==='puprime-parser'?'<span class="src-tag">⚡ MT5</span>':'<span class="src-tag">✋ Manual</span>';
+              var desc=r.descricao?' • '+r.descricao:'';
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border);font-size:11px;gap:8px"><span style="color:var(--muted2);flex-shrink:0;font-family:var(--mono)">'+r.data+'</span><span style="color:var(--muted);font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tag+desc+'</span><span style="color:var(--orange,#f59e0b);font-weight:600;flex-shrink:0">−$'+Math.abs(r.valor).toFixed(2)+' <button class="spread-mini-btn" onclick="deleteRetirada(\''+r.id+'\')" style="margin-left:4px" title="Remover">✕</button></span></div>';
+            }).join('')+'</div>';
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function addRetirada(){
+  var a=getAcct(); if(!a) return;
+  var v=parseFloat(document.getElementById('ret-val').value); if(!v||isNaN(v)) return alert('Valor inválido');
+  var dt=document.getElementById('ret-dt').value||today();
+  var desc=document.getElementById('ret-desc').value.trim();
+  if(!Array.isArray(a.retiradas)) a.retiradas=[];
+  a.retiradas.push({id:uid(),valor:Math.abs(v),data:dt,descricao:desc||'Manual',source:'manual'});
+  saveDB();
+  renderRetiradas(); renderDashboard();
+  toast('💸 Saque de $'+Math.abs(v).toFixed(2)+' registrado');
+}
+
+function deleteRetirada(id){
+  var a=getAcct(); if(!a||!Array.isArray(a.retiradas)) return;
+  if(!confirm('Remover este saque?')) return;
+  a.retiradas=a.retiradas.filter(function(r){return r.id!==id;});
+  saveDB();
+  renderRetiradas(); renderDashboard();
+  toast('🗑 Saque removido');
+}
+
 function renderGeralDashboard(pane){
   var s=calcGeralStats();
   var assets=Object.entries(s.byAsset).sort(function(x,y){return y[1].res-x[1].res;});
@@ -1326,8 +1427,9 @@ function renderGeralDashboard(pane){
     <div class="kpi-grid">
       <div class="kpi c-purple"><div class="kpi-label">🌐 Saldo Total</div><div class="kpi-val purple">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">${DB.accounts.length} contas</div></div>
       <div class="kpi c-${s.totalRes>=0?'green':'red'}"><div class="kpi-label">Resultado Total</div><div class="kpi-val ${s.totalRes>=0?'green':'red'}">${fmtS(s.totalRes)}</div><div class="kpi-sub">ROI: ${fmtP(s.roi)}</div></div>
-      <div class="kpi c-blue"><div class="kpi-label">Capital Investido</div><div class="kpi-val blue">$${s.totalDep.toFixed(2)}</div><div class="kpi-sub">Soma depósitos</div></div>
+      <div class="kpi c-blue"><div class="kpi-label">Capital Investido</div><div class="kpi-val blue">$${s.capitalLiquido.toFixed(2)}</div><div class="kpi-sub">Dep $${s.totalDep.toFixed(2)} − Saq $${(s.totalRetiradas||0).toFixed(2)}</div></div>
       <div class="kpi c-purple"><div class="kpi-label">💳 Bônus Total</div><div class="kpi-val purple">$${(s.totalBonus||0).toFixed(2)}</div><div class="kpi-sub">Não sacável direto</div></div>
+      <div class="kpi c-orange"><div class="kpi-label">💸 Retiradas</div><div class="kpi-val orange">$${(s.totalRetiradas||0).toFixed(2)}</div><div class="kpi-sub">Total sacado</div></div>
       <div class="kpi c-yellow"><div class="kpi-label">Total Lotes</div><div class="kpi-val yellow">${s.totalLotes.toFixed(2)}</div><div class="kpi-sub">${s.totalOps} ops</div></div>
       <div class="kpi c-red"><div class="kpi-label">Custos Totais</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">Swap+Spread</div></div>
       <div class="kpi c-green"><div class="kpi-label">Win Rate Geral</div><div class="kpi-val green">${s.wr.toFixed(1)}%</div><div class="kpi-sub">W:${s.totalWins} L:${s.totalLosses}</div></div>
@@ -1923,7 +2025,8 @@ function renderRelatorio(){
         </div>
         <div class="report-hint">
           Cole o relatório COMPLETO (qualquer formato — vertical, tabular, em português ou inglês).<br>
-          Reconhece: <strong>Ticket, Instrumento, Direção (COMPRAR/VENDER), Preços, Lucro/Perda, Hora de abertura/fecho</strong>. Converte GOLD→XAUUSD automaticamente.
+          Reconhece: <strong>Ticket, Instrumento, Direção (COMPRAR/VENDER), Preços, Lucro/Perda, Hora de abertura/fecho</strong>. Converte GOLD→XAUUSD automaticamente.<br>
+          <span style="color:var(--accent3)">Extrai também:</span> <strong>📥 Depósitos</strong> (balance positivo), <strong>💳 Bônus</strong> (credit) e <strong style="color:#f59e0b">💸 Retiradas</strong> (balance negativo / Withdrawal). Cada item é deduplicado pelo Deal ID.
         </div>
         <div class="fg" style="margin-bottom:10px">
           <label>Texto do Relatório</label>
@@ -1946,6 +2049,9 @@ function renderRelatorio(){
         a.reports.slice().reverse().map(function(r){
           var meta=r.opsAdded+' novas';
           if(r.opsUpdated) meta+=' • '+r.opsUpdated+' atualizadas';
+          if(r.depositsAdded) meta+=' • +'+r.depositsAdded+' dep';
+          if(r.creditsAdded) meta+=' • +'+r.creditsAdded+' bônus';
+          if(r.withdrawalsAdded) meta+=' • −'+r.withdrawalsAdded+' saque(s)';
           return '<div class="rlog-item"><div class="rlog-head"><span class="rlog-date">'+r.importedAt+'</span><span class="rlog-meta">'+meta+'</span></div><div class="rlog-body">'+r.summary+'</div></div>';
         }).join('')}
       </div>
@@ -2094,7 +2200,7 @@ function parsePuPrimeMt5Daily(text){
   // Balance/Credit: DATE_TIME  DEAL_ID  (balance|credit)  ... DESCRIPTION ... AMOUNT
   var balCreditRe=/^(\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\d+)\s+(balance|credit)\s+(.+?)\s+(-?\d+\.\d{2})\s*$/i;
 
-  var opens=[], closes=[], deposits=[], credits=[];
+  var opens=[], closes=[], deposits=[], credits=[], withdrawals=[];
 
   lines.forEach(function(line){
     var t=line.trim();
@@ -2124,14 +2230,22 @@ function parsePuPrimeMt5Daily(text){
     if(bc){
       var amount=parseFloat(bc[5]);
       if(isNaN(amount)||amount===0) return;
+      var desc=bc[4].trim();
+      var type=bc[3].toLowerCase();
       var entry={
         dealId:bc[2],
-        valor:amount,
+        valor:Math.abs(amount),
         data:ppDate(bc[1]),
-        descricao:bc[4].trim()
+        descricao:desc
       };
-      if(bc[3].toLowerCase()==='credit') credits.push(entry);
-      else deposits.push(entry);
+      if(type==='credit'){
+        credits.push(entry);
+      } else {
+        // balance: positivo=depósito, negativo OU descrição "Withdrawal"=saque
+        var isWithdrawal=amount<0 || /withdrawal|saque|withdraw/i.test(desc);
+        if(isWithdrawal) withdrawals.push(entry);
+        else deposits.push(entry);
+      }
     }
   });
 
@@ -2164,6 +2278,7 @@ function parsePuPrimeMt5Daily(text){
     ops:ops,
     deposits:deposits,
     credits:credits,
+    withdrawals:withdrawals,
     unmatchedOpens:opens.filter(function(o,i){return !usedOpens[i];}).length
   };
 }
@@ -2249,42 +2364,40 @@ function preProcessDailyForAi(text){
 }
 
 // Extract balance (deposits/withdrawals) and credit (bonus) deals from raw daily text.
-// Handles PuPrime/MT5 deal-table format. Returns {deposits:[], credits:[]}.
+// Handles PuPrime/MT5 deal-table format. Returns {deposits:[], credits:[], withdrawals:[]}.
 function localParseBalanceAndCredit(text){
-  var deposits=[], credits=[];
-  if(!text) return {deposits:deposits,credits:credits};
+  var deposits=[], credits=[], withdrawals=[];
+  if(!text) return {deposits:deposits,credits:credits,withdrawals:withdrawals};
   var seen={};
-  // Match: YYYY.MM.DD HH:MM:SS  DEALID  (balance|credit)  ... DESCRIPTION ... AMOUNT
-  // Heuristic: line starts with date, contains "balance" or "credit" as standalone token
   var lines=text.split(/\r?\n/);
   var dateRe=/^(\d{4}[.\-/]\d{2}[.\-/]\d{2})/;
   lines.forEach(function(line){
-    if(!/\b(balance|credit)\b/i.test(line)) return;
+    if(!/\b(balance|credit|withdraw)\b/i.test(line)) return;
     var dm=line.match(dateRe); if(!dm) return;
     var date=dm[1].replace(/[.\-/]/g,'-');
-    // tokens separated by 2+ spaces or tabs
     var parts=line.split(/\t+|\s{2,}/).filter(function(t){return t.trim().length>0;});
     if(parts.length<4) return;
-    // find dealId (numeric, after the date/time)
     var dealId=null;
     for(var i=0;i<parts.length;i++){
       if(/^\d{6,}$/.test(parts[i])){dealId=parts[i];break;}
     }
     var type=/\bcredit\b/i.test(line)?'credit':'balance';
-    // amount: last numeric value in the line (may be -X.XX or X.XX)
     var amountMatch=line.match(/(-?\d+[,.]\d{2})\s*$/);
     if(!amountMatch) return;
     var amount=parseFloat(amountMatch[1].replace(',','.'));
     if(isNaN(amount)||amount===0) return;
-    // description: token containing "-" like "Deposit-USDT" or "Credit In-Welcome"
     var descMatch=line.match(/([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]*)?\-[A-Za-z0-9()\-_.]+)/);
     var descricao=descMatch?descMatch[1]:type;
     var key=(dealId||(date+'_'+amount+'_'+type));
     if(seen[key]) return; seen[key]=true;
-    var entry={dealId:dealId,valor:amount,data:date,descricao:descricao};
-    if(type==='credit') credits.push(entry); else deposits.push(entry);
+    // Withdrawal detection: negative balance OR description with withdraw
+    var isWithdrawal=type==='balance' && (amount<0 || /withdraw|saque/i.test(line));
+    var entry={dealId:dealId,valor:Math.abs(amount),data:date,descricao:descricao};
+    if(type==='credit') credits.push(entry);
+    else if(isWithdrawal) withdrawals.push(entry);
+    else deposits.push(entry);
   });
-  return {deposits:deposits,credits:credits};
+  return {deposits:deposits,credits:credits,withdrawals:withdrawals};
 }
 
 function parseLocalDateTime(str){
@@ -2375,9 +2488,9 @@ async function parseReport(){
   // ============= STEP 0: Try PuPrime/MT5 native parser (no AI) =============
   var pp=null;
   try{ pp=parsePuPrimeMt5Daily(text); }catch(e){ console.warn('PuPrime parser error:',e); }
-  if(pp&&(pp.ops.length>0||pp.deposits.length>0||pp.credits.length>0)){
+  if(pp&&(pp.ops.length>0||pp.deposits.length>0||pp.credits.length>0||(pp.withdrawals&&pp.withdrawals.length>0))){
     status.innerHTML='⚡ Detectado formato PuPrime/MT5. Aplicando '+pp.ops.length+' op(s)...';
-    if(!a.depositos) a.depositos=[]; if(!a.bonus) a.bonus=[];
+    if(!a.depositos) a.depositos=[]; if(!a.bonus) a.bonus=[]; if(!a.retiradas) a.retiradas=[];
     // Apply operations
     pp.ops.forEach(function(op){
       var existing=a.operacoes.find(function(o){return o.ticketId&&o.ticketId===String(op.ticketId);});
@@ -2400,8 +2513,8 @@ async function parseReport(){
         newCount++;
       }
     });
-    // Apply deposits + credits (dedup by dealId)
-    var depAdded=0, bonusAdded=0;
+    // Apply deposits + credits + withdrawals (dedup by dealId)
+    var depAdded=0, bonusAdded=0, withAdded=0;
     pp.deposits.forEach(function(d){
       var did=d.dealId?String(d.dealId):null;
       if(did&&a.depositos.some(function(x){return x.dealId===did;})) return;
@@ -2414,14 +2527,20 @@ async function parseReport(){
       a.bonus.push({id:uid(),dealId:did,valor:c.valor,data:c.data,descricao:c.descricao,source:'puprime-parser'});
       bonusAdded++;
     });
+    (pp.withdrawals||[]).forEach(function(w){
+      var did=w.dealId?String(w.dealId):null;
+      if(did&&a.retiradas.some(function(x){return x.dealId===did;})) return;
+      a.retiradas.push({id:uid(),dealId:did,valor:Math.abs(w.valor),data:w.data,descricao:w.descricao,source:'puprime-parser'});
+      withAdded++;
+    });
     var totalPnl=pp.ops.reduce(function(s,o){return s+o.resultado;},0);
     a.reports.push({
       id:uid(),
       importedAt:new Date().toLocaleString('pt-BR'),
       opsAdded:newCount,opsUpdated:updateCount,
-      depositsAdded:depAdded,creditsAdded:bonusAdded,
+      depositsAdded:depAdded,creditsAdded:bonusAdded,withdrawalsAdded:withAdded,
       totalProfit:totalPnl,
-      summary:'PuPrime/MT5 parser: '+pp.ops.length+' ops, '+depAdded+' dep, '+bonusAdded+' bonus',
+      summary:'PuPrime/MT5 parser: '+pp.ops.length+' ops, '+depAdded+' dep, '+bonusAdded+' bonus, '+withAdded+' saques',
       raw:text.slice(0,200),
       method:'puprime'
     });
@@ -2430,16 +2549,18 @@ async function parseReport(){
     if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
     if(depAdded>0) msg+=' | <span style="color:var(--accent)">+'+depAdded+' depósito(s)</span>';
     if(bonusAdded>0) msg+=' | <span style="color:var(--accent3)">+'+bonusAdded+' bônus</span>';
+    if(withAdded>0) msg+=' | <span style="color:#f59e0b">−'+withAdded+' saque(s)</span>';
     msg+=' <span style="color:var(--muted2)">(PuPrime/MT5 nativo, sem IA)</span>';
     if(pp.unmatchedOpens>0) msg+='<br><span style="color:var(--yellow);font-size:9px">⚠ '+pp.unmatchedOpens+' op(s) abertas sem fechamento neste daily</span>';
     status.innerHTML=msg;
-    var preview='⚡ Parser PuPrime/MT5 (sem IA) extraiu:\n\n'+pp.ops.length+' operações | '+pp.deposits.length+' depósitos | '+pp.credits.length+' bônus\n\nPrimeiras 3 ops:\n'+JSON.stringify(pp.ops.slice(0,3),null,2);
+    var preview='⚡ Parser PuPrime/MT5 (sem IA) extraiu:\n\n'+pp.ops.length+' operações | '+pp.deposits.length+' depósitos | '+pp.credits.length+' bônus | '+(pp.withdrawals||[]).length+' saques\n\nPrimeiras 3 ops:\n'+JSON.stringify(pp.ops.slice(0,3),null,2);
     document.getElementById('report-preview-wrap').style.display='block';
     document.getElementById('report-preview').textContent=preview;
-    renderRelatorio(); renderDashboard(); renderHistorico(); renderCustos();
+    renderRelatorio(); renderDashboard(); renderHistorico(); renderRetiradas(); renderCustos();
     var tm='⚡ '+newCount+' ops';
     if(depAdded>0) tm+=' + '+depAdded+' dep';
     if(bonusAdded>0) tm+=' + '+bonusAdded+' bônus';
+    if(withAdded>0) tm+=' + '+withAdded+' saque(s)';
     toast(tm);
     btn.disabled=false; btn.textContent='🤖 ANALISAR + ATUALIZAR';
     return;
@@ -2503,10 +2624,10 @@ async function parseReport(){
     var wins=localOps.filter(function(o){return o.resultado>0;}).length;
     summary='Parser local: '+localOps.length+' ops processadas (P&L $'+totalPnl.toFixed(2)+', '+wins+'W/'+(localOps.length-wins)+'L)';
 
-    // Extract deposits + credits (dedup by dealId)
+    // Extract deposits + credits + withdrawals (dedup by dealId)
     var bc=localParseBalanceAndCredit(text);
-    var depAddedL=0, bonusAddedL=0;
-    if(!a.depositos) a.depositos=[]; if(!a.bonus) a.bonus=[];
+    var depAddedL=0, bonusAddedL=0, withAddedL=0;
+    if(!a.depositos) a.depositos=[]; if(!a.bonus) a.bonus=[]; if(!a.retiradas) a.retiradas=[];
     bc.deposits.forEach(function(d){
       var did=d.dealId?String(d.dealId):null;
       if(did&&a.depositos.some(function(x){return x.dealId===did;})) return;
@@ -2519,6 +2640,12 @@ async function parseReport(){
       a.bonus.push({id:uid(),dealId:did,valor:c.valor,data:c.data,descricao:c.descricao,source:'local-parser'});
       bonusAddedL++;
     });
+    (bc.withdrawals||[]).forEach(function(w){
+      var did=w.dealId?String(w.dealId):null;
+      if(did&&a.retiradas.some(function(x){return x.dealId===did;})) return;
+      a.retiradas.push({id:uid(),dealId:did,valor:Math.abs(w.valor),data:w.data,descricao:w.descricao,source:'local-parser'});
+      withAddedL++;
+    });
 
     a.reports.push({
       id:uid(),
@@ -2527,6 +2654,7 @@ async function parseReport(){
       opsUpdated:updateCount,
       depositsAdded:depAddedL,
       creditsAdded:bonusAddedL,
+      withdrawalsAdded:withAddedL,
       totalProfit:totalPnl,
       summary:summary,
       raw:text.slice(0,200),
@@ -2536,6 +2664,9 @@ async function parseReport(){
     saveDB();
     var msg='✅ <span style="color:var(--accent)">'+newCount+' novas</span>';
     if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
+    if(depAddedL>0) msg+=' | <span style="color:var(--accent)">+'+depAddedL+' depósito(s)</span>';
+    if(bonusAddedL>0) msg+=' | <span style="color:var(--accent3)">+'+bonusAddedL+' bônus</span>';
+    if(withAddedL>0) msg+=' | <span style="color:#f59e0b">−'+withAddedL+' saque(s)</span>';
     msg+=' <span style="color:var(--muted2)">(parser local)</span>';
     status.innerHTML=msg;
 
@@ -2550,12 +2681,15 @@ async function parseReport(){
     }
     document.getElementById('report-preview-wrap').style.display='block';
     document.getElementById('report-preview').textContent=previewHtml;
-    
+
     renderRelatorio();
     renderDashboard();
     renderHistorico();
+    renderRetiradas();
     renderCustos();
-    toast('🤖 '+newCount+' novas + '+updateCount+' atualizadas');
+    var lt='🤖 '+newCount+' novas + '+updateCount+' atualizadas';
+    if(withAddedL>0) lt+=' + '+withAddedL+' saque(s)';
+    toast(lt);
     btn.disabled=false; btn.textContent='🤖 ANALISAR + ATUALIZAR';
     return;
   }
@@ -2592,10 +2726,10 @@ CAMPOS POSSÍVEIS NO TEXTO (varia por broker):
 - "Hora de fecho" / "Close Time"
 
 EXTRAIA TAMBÉM transações não-trade (DEALS do tipo balance/credit/withdrawal):
-- "balance" + comment "Deposit-*" → depósito real (POSITIVO)
-- "balance" + comment "Withdrawal-*" → saque (NEGATIVO, preserve sinal)
-- "credit" + comment "Credit In-*" / "Bonus-*" / "Welcome*" → BÔNUS/CRÉDITO (POSITIVO)
-- "credit" + comment "Credit Out-*" → REMOÇÃO de bônus (NEGATIVO)
+- "balance" com valor POSITIVO ou comment "Deposit-*" → vai em "deposits" (valor positivo)
+- "balance" com valor NEGATIVO ou comment "Withdrawal-*" / "Saque" → vai em "withdrawals" (sempre valor POSITIVO, o sinal é implícito)
+- "credit" + comment "Credit In-*" / "Bonus-*" / "Welcome*" → vai em "credits" (valor positivo)
+- "credit" + comment "Credit Out-*" → ignore (não suportado)
 
 RETORNE APENAS JSON puro, sem markdown:
 {
@@ -2632,6 +2766,14 @@ RETORNE APENAS JSON puro, sem markdown:
       "valor": 60.00,
       "data": "2026-05-01",
       "descricao": "Credit In-Welcome5020"
+    }
+  ],
+  "withdrawals": [
+    {
+      "dealId": "308117555",
+      "valor": 50.00,
+      "data": "2026-05-01",
+      "descricao": "Withdrawal-USDT(BEP20)"
     }
   ],
   "updates": [],
@@ -2744,14 +2886,21 @@ REGRAS CRÍTICAS:
       });
     }
 
-    // Auto-extract deposits (dedup by dealId)
-    var depAdded=0, bonusAdded=0;
+    // Auto-extract deposits / credits / withdrawals (dedup by dealId)
+    var depAdded=0, bonusAdded=0, withAdded=0;
     if(Array.isArray(parsed.deposits)){
       if(!a.depositos) a.depositos=[];
       parsed.deposits.forEach(function(d){
         var v=parseFloat(d.valor); if(!v||isNaN(v)) return;
         var did=d.dealId?String(d.dealId):null;
         if(did&&a.depositos.some(function(x){return x.dealId===did;})) return;
+        // Defensive: if IA returned a negative value here, route it to withdrawals
+        if(v<0){
+          if(!a.retiradas) a.retiradas=[];
+          a.retiradas.push({id:uid(),dealId:did,valor:Math.abs(v),data:d.data||today(),descricao:d.descricao||'Auto (IA)',source:'ai-parser'});
+          withAdded++;
+          return;
+        }
         a.depositos.push({id:uid(),dealId:did,valor:v,data:d.data||today(),descricao:d.descricao||'Auto (IA)',source:'ai-parser'});
         depAdded++;
       });
@@ -2760,10 +2909,21 @@ REGRAS CRÍTICAS:
       if(!a.bonus) a.bonus=[];
       parsed.credits.forEach(function(c){
         var v=parseFloat(c.valor); if(!v||isNaN(v)) return;
+        if(v<0) return; // ignore Credit Out
         var did=c.dealId?String(c.dealId):null;
         if(did&&a.bonus.some(function(x){return x.dealId===did;})) return;
         a.bonus.push({id:uid(),dealId:did,valor:v,data:c.data||today(),descricao:c.descricao||'Auto (IA)',source:'ai-parser'});
         bonusAdded++;
+      });
+    }
+    if(Array.isArray(parsed.withdrawals)){
+      if(!a.retiradas) a.retiradas=[];
+      parsed.withdrawals.forEach(function(w){
+        var v=parseFloat(w.valor); if(!v||isNaN(v)) return;
+        var did=w.dealId?String(w.dealId):null;
+        if(did&&a.retiradas.some(function(x){return x.dealId===did;})) return;
+        a.retiradas.push({id:uid(),dealId:did,valor:Math.abs(v),data:w.data||today(),descricao:w.descricao||'Auto (IA)',source:'ai-parser'});
+        withAdded++;
       });
     }
 
@@ -2774,6 +2934,7 @@ REGRAS CRÍTICAS:
       opsUpdated:updateCount,
       depositsAdded:depAdded,
       creditsAdded:bonusAdded,
+      withdrawalsAdded:withAdded,
       totalProfit:parsed.totalProfit||0,
       summary:parsed.summary||'Processado via IA.',
       raw:text.slice(0,200),
@@ -2785,6 +2946,7 @@ REGRAS CRÍTICAS:
     if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
     if(depAdded>0) msg+=' | <span style="color:var(--accent)">+'+depAdded+' depósito(s)</span>';
     if(bonusAdded>0) msg+=' | <span style="color:var(--accent3)">+'+bonusAdded+' bônus</span>';
+    if(withAdded>0) msg+=' | <span style="color:#f59e0b">−'+withAdded+' saque(s)</span>';
     msg+=' <span style="color:var(--muted2)">(IA)</span>';
     status.innerHTML=msg;
 
@@ -2794,10 +2956,12 @@ REGRAS CRÍTICAS:
     renderRelatorio();
     renderDashboard();
     renderHistorico();
+    renderRetiradas();
     renderCustos();
     var toastMsg='🤖 '+newCount+' ops';
     if(depAdded>0) toastMsg+=' + '+depAdded+' dep';
     if(bonusAdded>0) toastMsg+=' + '+bonusAdded+' bônus';
+    if(withAdded>0) toastMsg+=' + '+withAdded+' saque(s)';
     toast(toastMsg);
 
   }catch(e){
