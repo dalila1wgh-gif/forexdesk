@@ -227,6 +227,8 @@ tbody td{padding:9px 10px;white-space:nowrap;}
 .arb-pair-result{font-family:var(--head);font-size:15px;font-weight:700;text-align:right;}
 .arb-pair-spread{font-size:9px;color:var(--muted);}
 .arb-pair-pips{display:inline-block;font-size:9px;font-family:var(--mono);background:rgba(168,85,247,.15);color:var(--accent3);border:1px solid rgba(168,85,247,.3);padding:1px 6px;border-radius:8px;margin-left:4px;letter-spacing:.5px;}
+.arb-inspect-btn{background:rgba(59,130,246,.15);color:#3b82f6;border:1px solid rgba(59,130,246,.3);padding:1px 6px;border-radius:8px;margin-left:4px;font-size:10px;cursor:pointer;line-height:1.2;}
+.arb-inspect-btn:hover{background:rgba(59,130,246,.3);}
 .day-group{border-bottom:1px solid var(--border);}
 .day-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--s2);border-bottom:1px solid var(--border2);position:sticky;top:0;z-index:5;}
 .day-title{font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:.5px;}
@@ -699,13 +701,46 @@ function getPipFactor(asset){
   if(!asset) return 10000;
   var k=normalizeAsset(asset);
   if(PIP_FACTOR[k]!=null) return PIP_FACTOR[k];
+  // Substring match: handle variants like XAUUSD2, XAUUSDMICRO, BTCUSDPRO
+  var keys=Object.keys(PIP_FACTOR);
+  for(var i=0;i<keys.length;i++){
+    if(k.indexOf(keys[i])===0) return PIP_FACTOR[keys[i]];
+  }
   if(/JPY$/.test(k)) return 100;
+  if(/^XAU/.test(k)) return 100;
+  if(/^XAG/.test(k)) return 1000;
+  if(/^BTC|^ETH|^LTC|^XRP|^SOL|^BNB|^DOGE/.test(k)) return 1;
+  if(/(US30|US100|US500|NAS100|SPX500|DJI|NDX|SPX|DAX|GER|UK100|FTSE|JPN225|NIK)/.test(k)) return 1;
   return 10000;
 }
 
 function normalizeAsset(s){
   if(!s) return '';
-  return String(s).toUpperCase().replace(/[\/\s]/g,'').replace(/\.[A-Z]+$/,'');
+  var k=String(s).toUpperCase().replace(/[\/\s]/g,'');
+  // Strip common broker suffixes: .s .x .c .a .m .pro .micro .cash .ecn .raw .zero .std .r .i .#
+  k=k.replace(/\.[A-Z0-9]+$/,''); // dotted suffix
+  k=k.replace(/[#+@]+$/,'');       // trailing symbols
+  // Strip suffix words (case-insensitive already upper)
+  k=k.replace(/(MICRO|PRO|CASH|ECN|STD|RAW|ZERO|MINI)$/,'');
+  return k;
+}
+
+// Robust price parser: handles US ("4,640.51"), EU ("4.640,51"), spaces, NBSP
+function parsePrice(s){
+  if(s==null||s==='') return 0;
+  var str=String(s).trim().replace(/[\s ]/g,'');
+  // EU format: "4.640,51" — comma is decimal, dot is thousands
+  if(/,\d{1,4}$/.test(str)&&/\./.test(str)){
+    str=str.replace(/\./g,'').replace(',','.');
+  } else if(/,\d{1,4}$/.test(str)){
+    // "4640,51" — comma is decimal
+    str=str.replace(',','.');
+  } else {
+    // US: "4,640.51" — comma is thousands
+    str=str.replace(/,/g,'');
+  }
+  var n=parseFloat(str);
+  return isNaN(n)?0:n;
 }
 
 // Presets por corretora (sugestões realistas que o usuário pode ajustar)
@@ -1554,11 +1589,12 @@ function renderArbitragem(){
 
   var pairs=findArbitragePairs(DB.arbConfig.acctA, DB.arbConfig.acctB, DB.arbConfig.windowMinutes);
 
-  // Stats
+  // Stats — custo de execução só faz sentido pra hedge real (lados opostos)
+  var hedgePairs=pairs.filter(function(p){return p.isHedge;});
   var totalNet=pairs.reduce(function(s,p){return s+p.netResult;},0);
   var totalDiff=pairs.reduce(function(s,p){return s+p.spreadDiff;},0);
-  var totalExecCost=pairs.reduce(function(s,p){return s+(p.executionSpreadCost||0);},0);
-  var totalDiffPips=pairs.reduce(function(s,p){return s+(p.priceDiffPips||0);},0);
+  var totalExecCost=hedgePairs.reduce(function(s,p){return s+(p.executionSpreadCost||0);},0);
+  var totalDiffPips=hedgePairs.reduce(function(s,p){return s+(p.priceDiffPips||0);},0);
   var winsArb=pairs.filter(function(p){return p.netResult>0;}).length;
   var arbWR=pairs.length>0?(winsArb/pairs.length*100):0;
   var period=aggregatePairsByPeriod(pairs);
@@ -1606,7 +1642,7 @@ function renderArbitragem(){
     <div class="kpi-grid">
       <div class="kpi c-${totalNet>=0?'green':'red'}"><div class="kpi-label">Lucro Líquido Pares</div><div class="kpi-val ${totalNet>=0?'green':'red'}">${fmtS(totalNet)}</div><div class="kpi-sub">${pairs.length} pares</div></div>
       <div class="kpi c-purple"><div class="kpi-label">Win Rate Arb</div><div class="kpi-val purple">${arbWR.toFixed(1)}%</div><div class="kpi-sub">${winsArb}W ${pairs.length-winsArb}L</div></div>
-      <div class="kpi c-red"><div class="kpi-label">Custo Execução Hedge</div><div class="kpi-val red">$${totalExecCost.toFixed(2)}</div><div class="kpi-sub">${totalDiffPips.toFixed(0)} pips totais</div></div>
+      <div class="kpi c-red"><div class="kpi-label">Custo Execução Hedge</div><div class="kpi-val red">$${totalExecCost.toFixed(2)}</div><div class="kpi-sub">${totalDiffPips.toFixed(0)} pips • ${hedgePairs.length} hedge${hedgePairs.length!==1?'s':''}</div></div>
       <div class="kpi c-yellow"><div class="kpi-label">Bid/Ask + Swap</div><div class="kpi-val yellow">$${totalDiff.toFixed(2)}</div><div class="kpi-sub">Custo broker fixo</div></div>
       <div class="kpi c-${worstBroker?'red':'blue'}"><div class="kpi-label">Broker Slow</div><div class="kpi-val red" style="font-size:13px">${worstBroker?worstBroker[0].substring(0,12):'—'}</div><div class="kpi-sub">${worstBroker?worstBroker[1]+'x atrasou':'Sem dados'}</div></div>
     </div>
@@ -1700,8 +1736,8 @@ function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
     var spreadDiff=totalSpread+totalSwap;
 
     // NEW: execution spread (price difference between the 2 brokers at open)
-    var priceA=parseFloat(String(oa.entrada||'').replace(/,/g,''))||0;
-    var priceB=parseFloat(String(ob.entrada||'').replace(/,/g,''))||0;
+    var priceA=parsePrice(oa.entrada);
+    var priceB=parsePrice(ob.entrada);
     var pairLots=Math.min(oa.lotes||0, ob.lotes||0);
     var pipFactor=getPipFactor(oa._parKey);
     var pipValue=getPipValueForAsset(a, oa._parKey)||getPipValueForAsset(b, oa._parKey);
@@ -1734,6 +1770,9 @@ function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
       executionSpreadCost:executionSpreadCost,
       pairLots:pairLots,
       pipValue:pipValue,
+      pipFactor:pipFactor,
+      priceA:priceA,
+      priceB:priceB,
       slowBroker:slowBroker,
       isHedge:oa.tipo!==ob.tipo
     });
@@ -1770,17 +1809,36 @@ function parseTime(ts){
   }catch(e){return 0;}
 }
 
+var ARB_PAIR_CACHE={};
+function inspectArbPair(key){
+  var p=ARB_PAIR_CACHE[key]; if(!p) return;
+  var diff=Math.abs(p.priceA-p.priceB);
+  var msg='🔍 INSPETOR DE PAR\n\n'+
+    'Ativo: '+p.asset+'  (pipFactor='+p.pipFactor+', pipValue=$'+p.pipValue.toFixed(2)+'/pip/lote)\n'+
+    'Hedge: '+(p.isHedge?'SIM':'NÃO (mesmo lado)')+'\n\n'+
+    p.opA._acctName+': '+p.opA.tipo+' '+p.opA.lotes.toFixed(2)+' lotes @ '+p.priceA+'\n'+
+    p.opB._acctName+': '+p.opB.tipo+' '+p.opB.lotes.toFixed(2)+' lotes @ '+p.priceB+'\n\n'+
+    'Diff de preço: '+diff.toFixed(5)+'\n'+
+    'Δ Pips = '+diff.toFixed(5)+' × '+p.pipFactor+' = '+p.priceDiffPips.toFixed(2)+' pips\n'+
+    'Custo Execução = '+p.priceDiffPips.toFixed(2)+' pips × $'+p.pipValue.toFixed(2)+' × '+p.pairLots.toFixed(2)+' lotes\n'+
+    '             = $'+p.executionSpreadCost.toFixed(2);
+  alert(msg);
+  try{ console.log('Inspect pair:',p); }catch(e){}
+}
+
 function renderArbPair(p){
   var timeStr=formatTimeDiff(p.timeDiffSec);
   var dateA=p.opA.openTime?p.opA.openTime.split(' ')[0]:p.opA.data;
   var hedgeBadge=p.isHedge?'<span class="pill pill-purple">HEDGE</span>':'<span class="pill pill-blue">MESMO LADO</span>';
+  var pairKey=p.opA.id+'__'+p.opB.id;
+  ARB_PAIR_CACHE[pairKey]=p;
 
   var pipsBadge=p.priceDiffPips?'<span class="arb-pair-pips">Δ '+p.priceDiffPips.toFixed(1)+' pips</span>':'';
   return `
     <div class="arb-pair-card">
       <div class="arb-pair-head">
         <div>
-          <div class="arb-pair-asset">${p.asset} ${hedgeBadge} ${pipsBadge}</div>
+          <div class="arb-pair-asset">${p.asset} ${hedgeBadge} ${pipsBadge} <button class="arb-inspect-btn" onclick="inspectArbPair('${pairKey}')" title="Ver cálculo">🔍</button></div>
           <div class="arb-pair-time">${dateA} • Δ ${timeStr}</div>
         </div>
         <div>
@@ -1994,6 +2052,202 @@ function localParseReport(text){
   return ops;
 }
 
+// =========================================================================
+// PUPRIME / MT5 NATIVE PARSER (no AI required)
+// Recognizes "Orders:" + "Deals:" sections in tabular format used by
+// PuPrime, FBS, MT4/MT5-derived brokers. Returns null when format unknown.
+// =========================================================================
+function parsePuPrimeMt5Daily(text){
+  if(!text||typeof text!=='string') return null;
+  var hasOrders=/^\s*Orders:\s*$/m.test(text);
+  var hasDeals=/^\s*Deals:\s*$/m.test(text);
+  if(!hasOrders||!hasDeals) return null;
+
+  // Isolate Deals section (between "Deals:" and next section/EOF)
+  var dealsStart=text.search(/^\s*Deals:\s*$/m);
+  if(dealsStart<0) return null;
+  // Skip the "Deals:" line itself
+  var afterHeader=text.indexOf('\n',dealsStart);
+  if(afterHeader<0) return null;
+  var dealsEnd=text.length;
+  var nextSections=[/^\s*Positions:\s*$/m,/^\s*Working Orders:\s*$/m,/^\s*A\/C Summary:\s*$/m];
+  nextSections.forEach(function(re){
+    var idx=text.slice(afterHeader).search(re);
+    if(idx>=0 && (afterHeader+idx)<dealsEnd) dealsEnd=afterHeader+idx;
+  });
+  var dealsBlock=text.slice(afterHeader,dealsEnd);
+
+  // Skip the column header row inside Deals: (starts with "Open Time" or "   Open Time")
+  var lines=dealsBlock.split(/\r?\n/).filter(function(l){
+    var t=l.trim();
+    if(!t) return false;
+    if(/^Open\s+Time\b/i.test(t)) return false;
+    if(/^Total:/i.test(t)) return false;
+    if(/^Closed P\/L:/i.test(t)) return false;
+    return true;
+  });
+
+  // Regexes for deal rows
+  // Trade deal: DATE_TIME  TICKET  (buy|sell)  SIZE  ITEM  PRICE  ORDER_REF  COMMENT  (in|out)  COMM  FEE  SWAP  PROFIT
+  // Comment may contain spaces (ex: "[so 19.96%/25.94/129.94]") — use non-greedy with word-boundary on in/out
+  var tradeDealRe=/^(\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\d+)\s+(buy|sell)\s+([\d.]+)\s+(\S+)\s+([\d.]+)\s+(\d+)\s+(.+?)\s+\b(in|out)\b\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*$/i;
+  // Balance/Credit: DATE_TIME  DEAL_ID  (balance|credit)  ... DESCRIPTION ... AMOUNT
+  var balCreditRe=/^(\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\d+)\s+(balance|credit)\s+(.+?)\s+(-?\d+\.\d{2})\s*$/i;
+
+  var opens=[], closes=[], deposits=[], credits=[];
+
+  lines.forEach(function(line){
+    var t=line.trim();
+    var td=t.match(tradeDealRe);
+    if(td){
+      var rec={
+        timeStr:td[1].trim(),
+        ticket:td[2],
+        type:td[3].toUpperCase(),
+        lotes:parseFloat(td[4]),
+        item:td[5],
+        price:td[6],
+        orderRef:td[7],
+        comment:td[8],
+        entry:td[9].toLowerCase(),
+        commission:parseFloat(td[10])||0,
+        fee:parseFloat(td[11])||0,
+        swap:Math.abs(parseFloat(td[12])||0),
+        profit:parseFloat(td[13])||0,
+        _ms:ppTs(td[1])
+      };
+      if(rec.entry==='in') opens.push(rec);
+      else if(rec.entry==='out') closes.push(rec);
+      return;
+    }
+    var bc=t.match(balCreditRe);
+    if(bc){
+      var amount=parseFloat(bc[5]);
+      if(isNaN(amount)||amount===0) return;
+      var entry={
+        dealId:bc[2],
+        valor:amount,
+        data:ppDate(bc[1]),
+        descricao:bc[4].trim()
+      };
+      if(bc[3].toLowerCase()==='credit') credits.push(entry);
+      else deposits.push(entry);
+    }
+  });
+
+  // Match opens to closes (FIFO by item, opposite type, similar lots)
+  opens.sort(function(a,b){return a._ms-b._ms;});
+  closes.sort(function(a,b){return a._ms-b._ms;});
+  var ops=[]; var usedOpens={};
+  closes.forEach(function(c){
+    var itemNorm=normalizeAsset(c.item);
+    var matchIdx=-1;
+    for(var i=0;i<opens.length;i++){
+      if(usedOpens[i]) continue;
+      var o=opens[i];
+      if(normalizeAsset(o.item)!==itemNorm) continue;
+      if(o.type===c.type) continue; // open and close are opposite directions
+      if(Math.abs(o.lotes-c.lotes)>=0.005) continue;
+      if(o._ms>c._ms) continue;
+      matchIdx=i; break;
+    }
+    if(matchIdx>=0){
+      var op=opens[matchIdx]; usedOpens[matchIdx]=true;
+      ops.push(buildOp(op,c));
+    }else{
+      // Orphan close (close without matching open in this window) — still record
+      ops.push(buildOp(null,c));
+    }
+  });
+
+  return {
+    ops:ops,
+    deposits:deposits,
+    credits:credits,
+    unmatchedOpens:opens.filter(function(o,i){return !usedOpens[i];}).length
+  };
+}
+
+function ppTs(s){
+  if(!s) return 0;
+  // "2026.05.01 19:29:10" -> Date
+  var iso=s.replace(/\./g,'-').replace(' ','T');
+  var t=new Date(iso).getTime();
+  return isNaN(t)?0:t;
+}
+function ppDate(s){
+  if(!s) return today();
+  return s.split(/\s+/)[0].replace(/\./g,'-');
+}
+function ppDateTime(s){
+  if(!s) return null;
+  var parts=s.trim().split(/\s+/);
+  if(parts.length<2) return null;
+  return parts[0].replace(/\./g,'-')+' '+parts[1];
+}
+function buildOp(openDeal, closeDeal){
+  var c=closeDeal;
+  var entrada='', openTime=null, durationSec=null, tipo;
+  if(openDeal){
+    entrada=openDeal.price;
+    openTime=ppDateTime(openDeal.timeStr);
+    var closeTime=ppDateTime(c.timeStr);
+    if(openTime&&closeTime){
+      try{
+        var dt=(new Date(closeTime.replace(' ','T'))-new Date(openTime.replace(' ','T')))/1000;
+        if(!isNaN(dt)&&dt>=0) durationSec=Math.floor(dt);
+      }catch(e){}
+    }
+    tipo=openDeal.type; // direction of the OPEN (BUY or SELL)
+  }else{
+    // If we only have the close deal, infer open direction = opposite of close
+    tipo=c.type==='BUY'?'SELL':'BUY';
+  }
+  return {
+    ticketId:String((openDeal&&openDeal.orderRef)||c.orderRef||c.ticket),
+    par:normalizeAsset(c.item),
+    tipo:tipo,
+    lotes:c.lotes,
+    entrada:String(entrada||''),
+    saida:String(c.price||''),
+    resultado:c.profit,
+    swap:c.swap,
+    spread:0,
+    slippage:null,
+    data:ppDate(c.timeStr),
+    openTime:openTime,
+    closeTime:ppDateTime(c.timeStr),
+    durationSec:durationSec,
+    closeReason:c.comment||'closePosition',
+    source:'puprime-parser'
+  };
+}
+
+// =========================================================================
+// PRE-PROCESSOR for AI fallback: strip noise from daily before sending
+// =========================================================================
+function preProcessDailyForAi(text){
+  if(!text||typeof text!=='string') return text;
+  if(text.length<500) return text; // too small to bother
+  var cleaned=text;
+  // Keep only Orders+Deals sections if both present
+  var ordersIdx=cleaned.search(/^\s*Orders:\s*$/m);
+  var dealsIdx=cleaned.search(/^\s*Deals:\s*$/m);
+  if(ordersIdx>=0&&dealsIdx>=0){
+    var endIdx=cleaned.length;
+    [/^\s*Positions:\s*$/m,/^\s*Working Orders:\s*$/m,/^\s*A\/C Summary:\s*$/m].forEach(function(re){
+      var idx=cleaned.search(re);
+      if(idx>dealsIdx && idx<endIdx) endIdx=idx;
+    });
+    cleaned=cleaned.slice(ordersIdx,endIdx);
+  }
+  // Strip residual noise
+  cleaned=cleaned.replace(/A\/C Summary:[\s\S]*$/,'');
+  cleaned=cleaned.replace(/No transactions/g,'');
+  cleaned=cleaned.replace(/\n{3,}/g,'\n\n');
+  return cleaned;
+}
+
 // Extract balance (deposits/withdrawals) and credit (bonus) deals from raw daily text.
 // Handles PuPrime/MT5 deal-table format. Returns {deposits:[], credits:[]}.
 function localParseBalanceAndCredit(text){
@@ -2113,18 +2367,93 @@ async function parseReport(){
   var btn=document.getElementById('btn-parse');
   var status=document.getElementById('parse-status');
   btn.disabled=true; btn.textContent='⏳ Analisando...';
-  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Tentando parser local primeiro...';
+  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Detectando formato...';
 
-  // ============= STEP 1: Try LOCAL parser first (fast, no API needed) =============
+  var newCount=0, updateCount=0, updateLog=[];
+  var summary='';
+
+  // ============= STEP 0: Try PuPrime/MT5 native parser (no AI) =============
+  var pp=null;
+  try{ pp=parsePuPrimeMt5Daily(text); }catch(e){ console.warn('PuPrime parser error:',e); }
+  if(pp&&(pp.ops.length>0||pp.deposits.length>0||pp.credits.length>0)){
+    status.innerHTML='⚡ Detectado formato PuPrime/MT5. Aplicando '+pp.ops.length+' op(s)...';
+    if(!a.depositos) a.depositos=[]; if(!a.bonus) a.bonus=[];
+    // Apply operations
+    pp.ops.forEach(function(op){
+      var existing=a.operacoes.find(function(o){return o.ticketId&&o.ticketId===String(op.ticketId);});
+      if(existing){
+        Object.keys(op).forEach(function(k){
+          if((existing[k]===undefined||existing[k]===null||existing[k]===''||(k!=='resultado'&&existing[k]===0))&&op[k]!=null&&op[k]!==''){
+            updateLog.push({par:existing.par,field:k,old:existing[k]||'—',new:op[k]});
+            existing[k]=op[k];
+          }
+        });
+        existing.lastUpdated=new Date().toLocaleString('pt-BR');
+        updateCount++;
+      }else{
+        var newOp=Object.assign({id:uid()},op);
+        if(newOp.spread===0||newOp.spread==null){
+          var calcS=calculateOpSpread(newOp,a);
+          if(calcS>0){ newOp.spread=calcS; newOp.spreadCalculated=true; }
+        }
+        a.operacoes.push(newOp);
+        newCount++;
+      }
+    });
+    // Apply deposits + credits (dedup by dealId)
+    var depAdded=0, bonusAdded=0;
+    pp.deposits.forEach(function(d){
+      var did=d.dealId?String(d.dealId):null;
+      if(did&&a.depositos.some(function(x){return x.dealId===did;})) return;
+      a.depositos.push({id:uid(),dealId:did,valor:d.valor,data:d.data,descricao:d.descricao,source:'puprime-parser'});
+      depAdded++;
+    });
+    pp.credits.forEach(function(c){
+      var did=c.dealId?String(c.dealId):null;
+      if(did&&a.bonus.some(function(x){return x.dealId===did;})) return;
+      a.bonus.push({id:uid(),dealId:did,valor:c.valor,data:c.data,descricao:c.descricao,source:'puprime-parser'});
+      bonusAdded++;
+    });
+    var totalPnl=pp.ops.reduce(function(s,o){return s+o.resultado;},0);
+    a.reports.push({
+      id:uid(),
+      importedAt:new Date().toLocaleString('pt-BR'),
+      opsAdded:newCount,opsUpdated:updateCount,
+      depositsAdded:depAdded,creditsAdded:bonusAdded,
+      totalProfit:totalPnl,
+      summary:'PuPrime/MT5 parser: '+pp.ops.length+' ops, '+depAdded+' dep, '+bonusAdded+' bonus',
+      raw:text.slice(0,200),
+      method:'puprime'
+    });
+    saveDB();
+    var msg='⚡ <span style="color:var(--accent)">'+newCount+' novas</span>';
+    if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
+    if(depAdded>0) msg+=' | <span style="color:var(--accent)">+'+depAdded+' depósito(s)</span>';
+    if(bonusAdded>0) msg+=' | <span style="color:var(--accent3)">+'+bonusAdded+' bônus</span>';
+    msg+=' <span style="color:var(--muted2)">(PuPrime/MT5 nativo, sem IA)</span>';
+    if(pp.unmatchedOpens>0) msg+='<br><span style="color:var(--yellow);font-size:9px">⚠ '+pp.unmatchedOpens+' op(s) abertas sem fechamento neste daily</span>';
+    status.innerHTML=msg;
+    var preview='⚡ Parser PuPrime/MT5 (sem IA) extraiu:\n\n'+pp.ops.length+' operações | '+pp.deposits.length+' depósitos | '+pp.credits.length+' bônus\n\nPrimeiras 3 ops:\n'+JSON.stringify(pp.ops.slice(0,3),null,2);
+    document.getElementById('report-preview-wrap').style.display='block';
+    document.getElementById('report-preview').textContent=preview;
+    renderRelatorio(); renderDashboard(); renderHistorico(); renderCustos();
+    var tm='⚡ '+newCount+' ops';
+    if(depAdded>0) tm+=' + '+depAdded+' dep';
+    if(bonusAdded>0) tm+=' + '+bonusAdded+' bônus';
+    toast(tm);
+    btn.disabled=false; btn.textContent='🤖 ANALISAR + ATUALIZAR';
+    return;
+  }
+
+  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Formato PuPrime não detectado. Tentando parser PT-BR...';
+
+  // ============= STEP 1: Try LOCAL PT-BR parser (Bullex, MT4 PT-BR, etc.) =============
   var localOps=[];
   try{
     localOps=localParseReport(text);
   }catch(e){
     console.warn('Local parser failed:',e);
   }
-
-  var newCount=0, updateCount=0, updateLog=[];
-  var summary='';
 
   if(localOps.length>0){
     status.innerHTML='✅ Parser local extraiu '+localOps.length+' operações. Aplicando...';
@@ -2231,8 +2560,13 @@ async function parseReport(){
     return;
   }
 
-  // ============= STEP 2: Fallback to AI parser =============
-  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Parser local não encontrou padrão. Usando IA...';
+  // ============= STEP 2: Fallback to AI parser (with preprocessing) =============
+  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Formato desconhecido. Pré-processando + IA Claude...';
+  var originalText=text;
+  text=preProcessDailyForAi(text);
+  if(text.length<originalText.length*0.9){
+    console.log('Pré-processador reduziu '+originalText.length+'→'+text.length+' chars');
+  }
 
   var existingOps=a.operacoes.map(function(o){return {id:o.id,ticketId:o.ticketId,par:o.par,lotes:o.lotes,data:o.data};});
 
