@@ -2043,6 +2043,69 @@ function parseLocalDateTime(str){
   return y+'-'+mo+'-'+d+' '+m[4];
 }
 
+// Robust JSON parser that handles malformed/truncated AI responses.
+// Tries: strip markdown -> first {} block -> remove trailing commas -> repair truncation -> JSON5-like fallback.
+function tryParseAiJson(raw){
+  if(!raw||typeof raw!=='string') return null;
+  // 1. Strip ```json / ``` fences
+  var s=raw.replace(/^[\s\S]*?```json\s*/i,'').replace(/```[\s\S]*$/,'').trim();
+  if(s===raw.trim()) s=raw.replace(/```/g,'').trim();
+  // 2. Extract first balanced {} block
+  var start=s.indexOf('{');
+  if(start<0) return null;
+  // Try literal parse first
+  var tryParse=function(t){ try{return JSON.parse(t);}catch(e){return null;} };
+  var p=tryParse(s.slice(start));
+  if(p) return p;
+  // 3. Try removing trailing commas (",}" "],}" etc.)
+  var clean=s.slice(start).replace(/,(\s*[}\]])/g,'$1');
+  p=tryParse(clean); if(p) return p;
+  // 4. Try to balance braces by scanning and cutting at last complete object/array
+  var balance=function(str){
+    var depth=0, inStr=false, esc=false, lastSafe=-1;
+    for(var i=0;i<str.length;i++){
+      var c=str[i];
+      if(esc){esc=false;continue;}
+      if(c==='\\'){esc=true;continue;}
+      if(c==='"'){inStr=!inStr;continue;}
+      if(inStr) continue;
+      if(c==='{'||c==='[') depth++;
+      else if(c==='}'||c===']'){ depth--; if(depth===0) lastSafe=i; }
+    }
+    return lastSafe>0?str.slice(0,lastSafe+1):null;
+  };
+  var balanced=balance(clean);
+  if(balanced){ p=tryParse(balanced); if(p) return p; }
+  // 5. Truncation repair: if JSON is cut mid-array, close arrays/object and try
+  var repair=function(str){
+    str=str.replace(/,(\s*[}\]])/g,'$1');
+    // Remove trailing incomplete element (cut at last , or [ before end)
+    var lastComma=Math.max(str.lastIndexOf(','),str.lastIndexOf('['));
+    if(lastComma>0){
+      var head=str.slice(0,lastComma);
+      // Count open structures
+      var depth=0, openStack=[], inStr=false, esc=false;
+      for(var i=0;i<head.length;i++){
+        var c=head[i];
+        if(esc){esc=false;continue;}
+        if(c==='\\'){esc=true;continue;}
+        if(c==='"'){inStr=!inStr;continue;}
+        if(inStr) continue;
+        if(c==='{'){openStack.push('}');depth++;}
+        else if(c==='['){openStack.push(']');depth++;}
+        else if(c==='}'||c===']'){openStack.pop();depth--;}
+      }
+      // Close in reverse
+      var closed=head+openStack.reverse().join('');
+      return closed;
+    }
+    return null;
+  };
+  var repaired=repair(clean);
+  if(repaired){ p=tryParse(repaired); if(p) return p; }
+  return null;
+}
+
 async function parseReport(){
   var a=getAcct(); if(!a) return;
   var text=document.getElementById('report-text').value.trim();
@@ -2267,17 +2330,24 @@ REGRAS CRÍTICAS:
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
-        max_tokens:4000,
+        max_tokens:8192,
         system:systemPrompt,
-        messages:[{role:'user',content:'Extraia TODAS as operações deste relatório:\n\n'+text}]
+        messages:[{role:'user',content:'Extraia TODAS as operações deste relatório. Retorne APENAS JSON válido, sem texto antes ou depois.\n\n'+text}]
       })
     });
     var data=await res.json();
     var raw=data.content&&data.content.map(function(b){return b.text||'';}).join('')||'';
-    var clean=raw.replace(/```json|```/g,'').trim();
-    var jsonMatch=clean.match(/\{[\s\S]*\}/);
-    if(jsonMatch) clean=jsonMatch[0];
-    var parsed=JSON.parse(clean);
+    var stopReason=data.stop_reason||'';
+    var parsed=tryParseAiJson(raw);
+    if(!parsed){
+      // Save raw to preview and surface clearer error
+      document.getElementById('report-preview-wrap').style.display='block';
+      document.getElementById('report-preview').textContent='[Resposta crua da IA — não foi JSON válido]\n\nstop_reason: '+stopReason+'\n\n'+raw.slice(0,4000);
+      var hint='';
+      if(stopReason==='max_tokens') hint=' A IA estourou o limite de tokens — corte o relatório em partes menores (até 50 ops por vez).';
+      else hint=' A IA retornou algo que não conseguimos parsear. Veja preview abaixo. Tente reduzir o relatório ou tente novamente.';
+      throw new Error('JSON inválido da IA.'+hint);
+    }
 
     if(parsed.updates&&parsed.updates.length>0){
       parsed.updates.forEach(function(u){
