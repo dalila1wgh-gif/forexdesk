@@ -223,6 +223,15 @@ tbody td{padding:8px 10px;white-space:nowrap;}
 .arb-pair-time{font-size:9px;color:var(--muted2);margin-top:3px;}
 .arb-pair-result{font-family:var(--head);font-size:15px;font-weight:700;text-align:right;}
 .arb-pair-spread{font-size:9px;color:var(--muted);}
+.arb-pair-pips{display:inline-block;font-size:9px;font-family:var(--mono);background:rgba(168,85,247,.15);color:var(--accent3);border:1px solid rgba(168,85,247,.3);padding:1px 6px;border-radius:8px;margin-left:4px;letter-spacing:.5px;}
+.arb-period-summary{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:12px;}
+.arb-period-title{font-size:10px;color:var(--accent2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:700;}
+.arb-period-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.arb-period-card{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px;text-align:center;}
+.arb-period-label{font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:4px;}
+.arb-period-val{font-family:var(--head);font-size:15px;font-weight:700;line-height:1.1;}
+.arb-period-sub{font-size:8px;color:var(--muted);margin-top:2px;}
+@media(max-width:520px){.arb-period-grid{grid-template-columns:repeat(2,1fr);}}
 
 .arb-leg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}
 .arb-leg-box{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:10px;}
@@ -627,9 +636,10 @@ function toast(msg){
 // ============================================================
 // SPREAD CONFIG (por CONTA/CORRETORA)
 // ============================================================
+// pipValue = $ por pip por lote padrão (1.0). Custo = pips × pipValue × lotes
 var SPREAD_PRESETS = {
-  'XAUUSD': { pips: 30, pipValue: 0.10, comm: 0 },
-  'XAGUSD': { pips: 3, pipValue: 5.00, comm: 0 },
+  'XAUUSD': { pips: 30, pipValue: 1.00, comm: 0 },
+  'XAGUSD': { pips: 3, pipValue: 50.00, comm: 0 },
   'EURUSD': { pips: 1.5, pipValue: 10.00, comm: 0 },
   'GBPUSD': { pips: 2, pipValue: 10.00, comm: 0 },
   'USDJPY': { pips: 1.5, pipValue: 10.00, comm: 0 },
@@ -645,14 +655,38 @@ var SPREAD_PRESETS = {
   'ETHUSD': { pips: 5, pipValue: 1.00, comm: 0 }
 };
 
+// pipFactor = multiplicador para converter diferença de preço em pips.
+// Ex: XAU 4500.00 → 4499.60 = 0.40 × 100 = 40 pips
+var PIP_FACTOR = {
+  'XAUUSD': 100, 'XAGUSD': 1000,
+  'EURUSD': 10000, 'GBPUSD': 10000, 'AUDUSD': 10000, 'NZDUSD': 10000, 'USDCAD': 10000, 'USDCHF': 10000,
+  'USDJPY': 100, 'GBPJPY': 100, 'EURJPY': 100, 'AUDJPY': 100, 'CHFJPY': 100, 'CADJPY': 100, 'NZDJPY': 100,
+  'US30': 1, 'NAS100': 1, 'SPX500': 1, 'GER40': 1, 'UK100': 1, 'JPN225': 1,
+  'BTCUSD': 1, 'ETHUSD': 1, 'XRPUSD': 100, 'LTCUSD': 100,
+  'WTI': 100, 'BRENT': 100, 'NATGAS': 1000
+};
+
+function getPipFactor(asset){
+  if(!asset) return 10000;
+  var k=normalizeAsset(asset);
+  if(PIP_FACTOR[k]!=null) return PIP_FACTOR[k];
+  if(/JPY$/.test(k)) return 100;
+  return 10000;
+}
+
+function normalizeAsset(s){
+  if(!s) return '';
+  return String(s).toUpperCase().replace(/[\/\s]/g,'').replace(/\.[A-Z]+$/,'');
+}
+
 // Presets por corretora (sugestões realistas que o usuário pode ajustar)
 var BROKER_PRESETS = {
-  'XM': { 'XAUUSD': { pips: 40, pipValue: 0.10, comm: 0 } },
-  'PUPRIME': { 'XAUUSD': { pips: 25, pipValue: 0.10, comm: 0 } },
-  'EXNESS': { 'XAUUSD': { pips: 22, pipValue: 0.10, comm: 0 } },
-  'BULLEX': { 'XAUUSD': { pips: 35, pipValue: 0.10, comm: 0 } },
-  'FBS': { 'XAUUSD': { pips: 28, pipValue: 0.10, comm: 0 } },
-  'POLARIUM': { 'XAUUSD': { pips: 30, pipValue: 0.10, comm: 0 } }
+  'XM': { 'XAUUSD': { pips: 40, pipValue: 1.00, comm: 0 } },
+  'PUPRIME': { 'XAUUSD': { pips: 25, pipValue: 1.00, comm: 0 } },
+  'EXNESS': { 'XAUUSD': { pips: 22, pipValue: 1.00, comm: 0 } },
+  'BULLEX': { 'XAUUSD': { pips: 35, pipValue: 1.00, comm: 0 } },
+  'FBS': { 'XAUUSD': { pips: 28, pipValue: 1.00, comm: 0 } },
+  'POLARIUM': { 'XAUUSD': { pips: 30, pipValue: 1.00, comm: 0 } }
 };
 
 function openSpreadModal(acctId){
@@ -724,9 +758,25 @@ function renderSpreadList(){
   if(!list) return;
   var configured=Object.keys(a.spreadConfig);
   var brokerKey=a.corretora?a.corretora.toUpperCase().replace(/[^A-Z]/g,''):'';
+
+  // Migration warning: legacy pipValue 0.10 for XAU (was wrong, should be 1.00)
+  var legacy=[];
+  configured.forEach(function(k){
+    var nk=normalizeAsset(k);
+    if((nk==='XAUUSD'||nk==='XAGUSD')&&a.spreadConfig[k].pipValue<0.5){
+      legacy.push(k);
+    }
+  });
+  var migrateBanner='';
+  if(legacy.length>0){
+    migrateBanner='<div style="font-size:10px;color:var(--yellow);margin-bottom:10px;padding:10px;background:rgba(255,200,0,.08);border:1px solid rgba(255,200,0,.3);border-radius:8px;line-height:1.5">⚠ <strong>Valores antigos detectados</strong> em '+legacy.join(', ')+': pipValue está abaixo de $0.50/pip. O valor correto para XAU é <strong>$1.00/pip por lote</strong> (assim 25 pips × 0.10 lote = $2.50). <button class="btn btn-b" style="margin-top:6px;padding:4px 10px;font-size:10px" onclick="migrateLegacyPipValue()">🔧 ATUALIZAR PARA $1.00/PIP</button></div>';
+  }
+
   var brokerHint='';
   if(BROKER_PRESETS[brokerKey]){
-    brokerHint='<div style="font-size:9px;color:var(--accent3);margin-bottom:6px;padding:6px 8px;background:rgba(168,85,247,.08);border-radius:6px">💡 Presets sugeridos para <strong>'+a.corretora+'</strong>:</div>';
+    brokerHint=migrateBanner+'<div style="font-size:9px;color:var(--accent3);margin-bottom:6px;padding:6px 8px;background:rgba(168,85,247,.08);border-radius:6px">💡 Presets sugeridos para <strong>'+a.corretora+'</strong>:</div>';
+  }else{
+    brokerHint=migrateBanner;
   }
   var presetsHtml=brokerHint+'<div class="preset-pills">';
   var unusedPresets=Object.keys(SPREAD_PRESETS).filter(function(k){return !a.spreadConfig[k];}).slice(0,10);
@@ -746,9 +796,39 @@ function renderSpreadList(){
   }).join('');
 }
 
+function migrateLegacyPipValue(){
+  var a=getCurrentSpreadAcct(); if(!a||!a.spreadConfig) return;
+  var migrated=[];
+  Object.keys(a.spreadConfig).forEach(function(k){
+    var nk=normalizeAsset(k);
+    if((nk==='XAUUSD'||nk==='XAGUSD')&&a.spreadConfig[k].pipValue<0.5){
+      var old=a.spreadConfig[k].pipValue;
+      a.spreadConfig[k].pipValue=(nk==='XAUUSD')?1.00:50.00;
+      migrated.push(k+' ('+old+' → '+a.spreadConfig[k].pipValue+')');
+    }
+  });
+  if(migrated.length===0) return;
+  if(!confirm('Atualizar pipValue de:\n\n'+migrated.join('\n')+'\n\nIsso vai recalcular custo de TODAS as operações desta conta. Confirmar?')){
+    return;
+  }
+  // Recalc spread on all ops
+  a.operacoes.forEach(function(op){
+    var calc=calculateOpSpread(op, a);
+    if(calc>0){
+      op.spread=calc;
+      op.spreadCalculated=true;
+    }
+  });
+  saveDB();
+  renderSpreadList();
+  if(typeof renderMain==='function') renderMain();
+  toast('✅ '+migrated.length+' ativos migrados e operações recalculadas');
+}
+
 function calculateOpSpread(op, account){
   if(!account||!account.spreadConfig) return 0;
-  var c=account.spreadConfig[op.par];
+  var key=normalizeAsset(op.par);
+  var c=account.spreadConfig[key]||account.spreadConfig[op.par];
   if(!c) return 0;
   return (c.pips*c.pipValue+(c.comm||0))*(op.lotes||0);
 }
@@ -1358,8 +1438,11 @@ function renderArbitragem(){
   // Stats
   var totalNet=pairs.reduce(function(s,p){return s+p.netResult;},0);
   var totalDiff=pairs.reduce(function(s,p){return s+p.spreadDiff;},0);
+  var totalExecCost=pairs.reduce(function(s,p){return s+(p.executionSpreadCost||0);},0);
+  var totalDiffPips=pairs.reduce(function(s,p){return s+(p.priceDiffPips||0);},0);
   var winsArb=pairs.filter(function(p){return p.netResult>0;}).length;
   var arbWR=pairs.length>0?(winsArb/pairs.length*100):0;
+  var period=aggregatePairsByPeriod(pairs);
 
   var slowCount={};
   pairs.forEach(function(p){
@@ -1404,8 +1487,35 @@ function renderArbitragem(){
     <div class="kpi-grid">
       <div class="kpi c-${totalNet>=0?'green':'red'}"><div class="kpi-label">Lucro Líquido Pares</div><div class="kpi-val ${totalNet>=0?'green':'red'}">${fmtS(totalNet)}</div><div class="kpi-sub">${pairs.length} pares</div></div>
       <div class="kpi c-purple"><div class="kpi-label">Win Rate Arb</div><div class="kpi-val purple">${arbWR.toFixed(1)}%</div><div class="kpi-sub">${winsArb}W ${pairs.length-winsArb}L</div></div>
-      <div class="kpi c-yellow"><div class="kpi-label">Diferença Spread</div><div class="kpi-val yellow">$${totalDiff.toFixed(2)}</div><div class="kpi-sub">Custo total spread</div></div>
+      <div class="kpi c-red"><div class="kpi-label">Custo Execução Hedge</div><div class="kpi-val red">$${totalExecCost.toFixed(2)}</div><div class="kpi-sub">${totalDiffPips.toFixed(0)} pips totais</div></div>
+      <div class="kpi c-yellow"><div class="kpi-label">Bid/Ask + Swap</div><div class="kpi-val yellow">$${totalDiff.toFixed(2)}</div><div class="kpi-sub">Custo broker fixo</div></div>
       <div class="kpi c-${worstBroker?'red':'blue'}"><div class="kpi-label">Broker Slow</div><div class="kpi-val red" style="font-size:13px">${worstBroker?worstBroker[0].substring(0,12):'—'}</div><div class="kpi-sub">${worstBroker?worstBroker[1]+'x atrasou':'Sem dados'}</div></div>
+    </div>
+
+    <div class="arb-period-summary">
+      <div class="arb-period-title">📅 Custo de Execução por Período (apenas hedge real)</div>
+      <div class="arb-period-grid">
+        <div class="arb-period-card">
+          <div class="arb-period-label">HOJE</div>
+          <div class="arb-period-val red">$${period.day.cost.toFixed(2)}</div>
+          <div class="arb-period-sub">${period.day.pips.toFixed(0)} pips • ${period.day.count} pares</div>
+        </div>
+        <div class="arb-period-card">
+          <div class="arb-period-label">SEMANA</div>
+          <div class="arb-period-val red">$${period.week.cost.toFixed(2)}</div>
+          <div class="arb-period-sub">${period.week.pips.toFixed(0)} pips • ${period.week.count} pares</div>
+        </div>
+        <div class="arb-period-card">
+          <div class="arb-period-label">MÊS</div>
+          <div class="arb-period-val red">$${period.month.cost.toFixed(2)}</div>
+          <div class="arb-period-sub">${period.month.pips.toFixed(0)} pips • ${period.month.count} pares</div>
+        </div>
+        <div class="arb-period-card">
+          <div class="arb-period-label">TOTAL</div>
+          <div class="arb-period-val red">$${period.total.cost.toFixed(2)}</div>
+          <div class="arb-period-sub">${period.total.pips.toFixed(0)} pips • ${period.total.count} pares</div>
+        </div>
+      </div>
     </div>
 
     <div class="sec">
@@ -1430,14 +1540,25 @@ function updateArbConfig(){
   renderArbitragem();
 }
 
+function getPipValueForAsset(account, assetNorm){
+  if(account&&account.spreadConfig){
+    var c=account.spreadConfig[assetNorm];
+    if(c&&c.pipValue) return c.pipValue;
+  }
+  var preset=SPREAD_PRESETS[assetNorm];
+  if(preset&&preset.pipValue) return preset.pipValue;
+  if(/JPY$/.test(assetNorm)) return 10.00;
+  return 10.00;
+}
+
 function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
   var a=DB.accounts.find(function(x){return x.id===acctIdA;});
   var b=DB.accounts.find(function(x){return x.id===acctIdB;});
   if(!a||!b||a.id===b.id) return [];
 
   var windowMs=windowMinutes*60*1000;
-  var opsA=a.operacoes.filter(function(o){return o.openTime;}).map(function(o){return Object.assign({},o,{_acctName:a.nome,_acctId:a.id,_openMs:parseTime(o.openTime)});});
-  var opsB=b.operacoes.filter(function(o){return o.openTime;}).map(function(o){return Object.assign({},o,{_acctName:b.nome,_acctId:b.id,_openMs:parseTime(o.openTime)});});
+  var opsA=a.operacoes.filter(function(o){return o.openTime;}).map(function(o){return Object.assign({},o,{_acctName:a.nome,_acctId:a.id,_openMs:parseTime(o.openTime),_parKey:normalizeAsset(o.par)});});
+  var opsB=b.operacoes.filter(function(o){return o.openTime;}).map(function(o){return Object.assign({},o,{_acctName:b.nome,_acctId:b.id,_openMs:parseTime(o.openTime),_parKey:normalizeAsset(o.par)});});
 
   var pairs=[];
   var usedB={};
@@ -1445,7 +1566,7 @@ function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
   opsA.forEach(function(oa){
     // Find closest matching op in B with same asset within window, not yet used
     var candidates=opsB.filter(function(ob){
-      return !usedB[ob.id] && ob.par===oa.par && Math.abs(ob._openMs-oa._openMs)<=windowMs;
+      return !usedB[ob.id] && ob._parKey===oa._parKey && Math.abs(ob._openMs-oa._openMs)<=windowMs;
     });
     if(candidates.length===0) return;
     // Take the closest by time
@@ -1459,6 +1580,18 @@ function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
     var totalSwap=(oa.swap||0)+(ob.swap||0);
     var spreadDiff=totalSpread+totalSwap;
 
+    // NEW: execution spread (price difference between the 2 brokers at open)
+    var priceA=parseFloat(String(oa.entrada||'').replace(/,/g,''))||0;
+    var priceB=parseFloat(String(ob.entrada||'').replace(/,/g,''))||0;
+    var pairLots=Math.min(oa.lotes||0, ob.lotes||0);
+    var pipFactor=getPipFactor(oa._parKey);
+    var pipValue=getPipValueForAsset(a, oa._parKey)||getPipValueForAsset(b, oa._parKey);
+    var priceDiffPips=0, executionSpreadCost=0;
+    if(priceA>0&&priceB>0){
+      priceDiffPips=Math.abs(priceA-priceB)*pipFactor;
+      executionSpreadCost=priceDiffPips*pipValue*pairLots;
+    }
+
     // Slippage analysis: who got worse execution?
     var slowBroker=null;
     if(oa.slippage!=null&&ob.slippage!=null){
@@ -1471,13 +1604,17 @@ function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
     }
 
     pairs.push({
-      asset:oa.par,
+      asset:oa._parKey,
       timeDiffSec:timeDiffSec,
       opA:oa, opB:ob,
       netResult:netResult,
       spreadDiff:spreadDiff,
       totalSpread:totalSpread,
       totalSwap:totalSwap,
+      priceDiffPips:priceDiffPips,
+      executionSpreadCost:executionSpreadCost,
+      pairLots:pairLots,
+      pipValue:pipValue,
       slowBroker:slowBroker,
       isHedge:oa.tipo!==ob.tipo
     });
@@ -1485,6 +1622,25 @@ function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
 
   pairs.sort(function(x,y){return y.opA._openMs-x.opA._openMs;});
   return pairs;
+}
+
+function aggregatePairsByPeriod(pairs){
+  var now=new Date();
+  var todayStr=now.toISOString().split('T')[0];
+  var weekStart=new Date(now); weekStart.setDate(now.getDate()-now.getDay()); var weekStartMs=weekStart.setHours(0,0,0,0);
+  var monthStart=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+
+  var agg={day:{pips:0,cost:0,count:0},week:{pips:0,cost:0,count:0},month:{pips:0,cost:0,count:0},total:{pips:0,cost:0,count:0}};
+  pairs.forEach(function(p){
+    if(!p.isHedge||!p.priceDiffPips) return;
+    var opMs=p.opA._openMs;
+    var opDate=p.opA.openTime?p.opA.openTime.split(' ')[0]:'';
+    agg.total.pips+=p.priceDiffPips; agg.total.cost+=p.executionSpreadCost; agg.total.count++;
+    if(opDate===todayStr){ agg.day.pips+=p.priceDiffPips; agg.day.cost+=p.executionSpreadCost; agg.day.count++; }
+    if(opMs>=weekStartMs){ agg.week.pips+=p.priceDiffPips; agg.week.cost+=p.executionSpreadCost; agg.week.count++; }
+    if(opMs>=monthStart){ agg.month.pips+=p.priceDiffPips; agg.month.cost+=p.executionSpreadCost; agg.month.count++; }
+  });
+  return agg;
 }
 
 function parseTime(ts){
@@ -1500,16 +1656,17 @@ function renderArbPair(p){
   var dateA=p.opA.openTime?p.opA.openTime.split(' ')[0]:p.opA.data;
   var hedgeBadge=p.isHedge?'<span class="pill pill-purple">HEDGE</span>':'<span class="pill pill-blue">MESMO LADO</span>';
 
+  var pipsBadge=p.priceDiffPips?'<span class="arb-pair-pips">Δ '+p.priceDiffPips.toFixed(1)+' pips</span>':'';
   return `
     <div class="arb-pair-card">
       <div class="arb-pair-head">
         <div>
-          <div class="arb-pair-asset">${p.asset} ${hedgeBadge}</div>
+          <div class="arb-pair-asset">${p.asset} ${hedgeBadge} ${pipsBadge}</div>
           <div class="arb-pair-time">${dateA} • Δ ${timeStr}</div>
         </div>
         <div>
           <div class="arb-pair-result ${p.netResult>=0?'green':'red'}">${fmtS(p.netResult)}</div>
-          <div class="arb-pair-spread">Custo: $${p.spreadDiff.toFixed(2)}</div>
+          <div class="arb-pair-spread">Execução: $${p.executionSpreadCost.toFixed(2)} • Bid/Ask: $${p.spreadDiff.toFixed(2)}</div>
         </div>
       </div>
       <div class="arb-leg">
@@ -1517,9 +1674,11 @@ function renderArbPair(p){
         ${renderArbLeg(p.opB, p.slowBroker===p.opB._acctName)}
       </div>
       <div class="arb-metrics">
-        <div class="arb-metric"><div class="arb-metric-label">Spread A</div><div class="arb-metric-val red">$${(p.opA.spread||0).toFixed(2)}</div></div>
-        <div class="arb-metric"><div class="arb-metric-label">Spread B</div><div class="arb-metric-val red">$${(p.opB.spread||0).toFixed(2)}</div></div>
-        <div class="arb-metric"><div class="arb-metric-label">Swap Total</div><div class="arb-metric-val orange">$${p.totalSwap.toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Δ Pips</div><div class="arb-metric-val purple">${p.priceDiffPips.toFixed(1)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Custo Execução</div><div class="arb-metric-val red">$${p.executionSpreadCost.toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Bid/Ask A+B</div><div class="arb-metric-val red">$${p.totalSpread.toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Swap</div><div class="arb-metric-val orange">$${p.totalSwap.toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Lotes (min)</div><div class="arb-metric-val blue">${p.pairLots.toFixed(2)}</div></div>
         <div class="arb-metric"><div class="arb-metric-label">Dur. Média</div><div class="arb-metric-val blue">${formatDurShort(((p.opA.durationSec||0)+(p.opB.durationSec||0))/2)}</div></div>
       </div>
     </div>
@@ -1671,7 +1830,7 @@ function localParseReport(text){
     var dir=direcao[1].toUpperCase();
     var tipo=(dir==='COMPRAR'||dir==='BUY')?'BUY':'SELL';
     
-    var instr=instrumento?instrumento[1].toUpperCase():'OUTRO';
+    var instr=instrumento?normalizeAsset(instrumento[1]):'OUTRO';
     if(instr==='GOLD') instr='XAUUSD';
     
     var openTime=horaAb?parseLocalDateTime(horaAb[1]):null;
@@ -1887,10 +2046,11 @@ REGRAS CRÍTICAS:
 1. EXTRAIA TODAS as operações, mesmo que sejam dezenas
 2. Datas DD/MM/YY → YYYY-MM-DD (25 = 2025, 26 = 2026)
 3. Lucro/Perda: PRESERVE o sinal negativo se houver "-$"
-4. GOLD = XAUUSD sempre
+4. GOLD = XAUUSD sempre. REMOVA sufixos de broker: XAUUSD.s → XAUUSD, EURUSD.x → EURUSD, BTCUSD.c → BTCUSD
 5. Se ticketId já existe na base, coloque em "updates" não em "newOperations"
 6. Calcule durationSec subtraindo openTime - closeTime
-7. swap deve ser POSITIVO (custo)`;
+7. swap deve ser POSITIVO (custo)
+8. "entrada" = preço de abertura (open price), "saida" = preço de fechamento. SEM vírgula como separador de milhar (4500.00 não 4,500.00)`;
 
   try{
     var aiUrl=DB.aiApiUrl||(location.origin+'/api/ai');
@@ -1943,7 +2103,7 @@ REGRAS CRÍTICAS:
         var newOp={
           id:uid(),
           ticketId:op.ticketId?String(op.ticketId):null,
-          par:(op.par||'OUTRO').toUpperCase().replace(/[\/\s]/g,''),
+          par:normalizeAsset(op.par||'OUTRO'),
           tipo:(op.tipo||'BUY').toUpperCase(),
           lotes:parseFloat(op.lotes)||0,
           entrada:String(op.entrada||''),
