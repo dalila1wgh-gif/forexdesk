@@ -361,6 +361,14 @@ tbody td{padding:8px 10px;white-space:nowrap;}
     </div>
     <div id="cloud-status" style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;min-height:14px;"></div>
 
+    <div style="font-size:11px;color:var(--accent2);margin-top:18px;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">🤖 IA (Claude)</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+      Por padrão, a IA usa o <strong>proxy serverless</strong> deste app (<code>/api/ai</code>), que mantém sua <strong>ANTHROPIC_API_KEY</strong> segura no servidor. Só altere se estiver usando um proxy customizado.
+    </div>
+    <div class="fg" style="margin-bottom:10px"><label>URL do proxy de IA (deixe vazio para usar /api/ai)</label><input id="ai-url" placeholder="https://seuapp.vercel.app/api/ai" autocomplete="off"></div>
+    <button class="btn btn-b" onclick="saveAiSettings()" style="margin-bottom:8px">💾 SALVAR URL DA IA</button>
+    <div id="ai-status" style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:8px;min-height:14px;"></div>
+
     <div style="font-size:11px;color:var(--accent3);margin-top:18px;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">📏 Spread por Corretora</div>
     <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
       Configure spread por <strong>cada conta</strong> (entre na conta → ⚙ Spread). Cada broker (XM, PuPrime, Exness, Bullex) tem spread próprio.
@@ -773,7 +781,28 @@ function openSettings(){
   document.getElementById('cloud-key').value=DB.cloudKey||'';
   document.getElementById('cloud-url').value=DB.cloudUrl||'';
   document.getElementById('cloud-auto').value=DB.cloudAuto||'off';
+  var aiInput=document.getElementById('ai-url');
+  if(aiInput) aiInput.value=DB.aiApiUrl||'';
+  var aiStatus=document.getElementById('ai-status');
+  if(aiStatus) aiStatus.textContent='';
   openModal('modal-settings');
+}
+
+function saveAiSettings(){
+  var el=document.getElementById('ai-url');
+  var status=document.getElementById('ai-status');
+  if(!el) return;
+  var val=el.value.trim();
+  if(val && !/^https?:\/\//i.test(val)){
+    if(status){status.textContent='⚠ URL inválida (precisa começar com http:// ou https://)';status.style.color='var(--red)';}
+    return;
+  }
+  DB.aiApiUrl=val;
+  saveDB();
+  if(status){
+    status.textContent=val?('✅ URL salva: '+val):'✅ Usando proxy padrão (/api/ai)';
+    status.style.color='var(--accent)';
+  }
 }
 
 function exportBackup(){
@@ -1864,7 +1893,8 @@ REGRAS CRÍTICAS:
 7. swap deve ser POSITIVO (custo)`;
 
   try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
+    var aiUrl=DB.aiApiUrl||(location.origin+'/api/ai');
+    var res=await fetch(aiUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -2254,7 +2284,8 @@ async function callChat(userMsg){
   chatHistory.push({role:'user',content:userMsg});
 
   try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
+    var aiUrl=DB.aiApiUrl||(location.origin+'/api/ai');
+    var res=await fetch(aiUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,system:system,messages:chatHistory})
