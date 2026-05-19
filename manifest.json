@@ -1,0 +1,22 @@
+{
+  "name": "ForexDesk",
+  "short_name": "ForexDesk",
+  "description": "Multi-account Forex management with AI analyst",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090f",
+  "theme_color": "#00ffb3",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgZmlsbD0iIzA3MDkwZiIgcng9IjI4Ii8+PHRleHQgeD0iOTYiIHk9IjEyMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzAwZmZiMyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RkQ8L3RleHQ+PC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzA3MDkwZiIgcng9Ijc1Ii8+PHRleHQgeD0iMjU2IiB5PSIzMjAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNDAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjMDBmZmIzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5GRDwvdGV4dD48L3N2Zz4=",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

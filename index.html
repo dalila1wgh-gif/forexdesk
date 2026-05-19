@@ -1,0 +1,2301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForexDesk - Cloud</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00ffb3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ForexDesk">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+:root{
+  --bg:#07090f;--s1:#0d1117;--s2:#131a26;--s3:#1a2235;
+  --border:#1f2d42;--border2:#2a3d56;
+  --accent:#00ffb3;--accent2:#3b82f6;--accent3:#a855f7;
+  --red:#f43f5e;--yellow:#fbbf24;--orange:#fb923c;
+  --text:#dde5f0;--muted:#4a5e78;--muted2:#6b7e96;
+  --mono:'JetBrains Mono',monospace;--head:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden;}
+
+.app{display:flex;flex-direction:column;height:100vh;max-height:100vh;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--s1);flex-shrink:0;}
+.logo{font-family:var(--head);font-weight:800;font-size:15px;color:var(--accent);letter-spacing:1px;}
+.logo span{color:var(--muted2);}
+.top-actions{display:flex;gap:6px;align-items:center;}
+.top-btn{background:var(--s2);border:1px solid var(--border2);color:var(--muted2);padding:5px 9px;border-radius:6px;font-size:10px;cursor:pointer;font-family:var(--mono);transition:all .2s;}
+.top-btn:hover{border-color:var(--accent);color:var(--accent);}
+.live-badge{display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+.acct-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--s1);overflow-x:auto;flex-shrink:0;}
+.acct-bar::-webkit-scrollbar{height:3px;}
+.acct-bar::-webkit-scrollbar-thumb{background:var(--border2);}
+.acct-chip{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);font-size:10px;cursor:pointer;white-space:nowrap;transition:all .2s;color:var(--muted2);}
+.acct-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(0,255,179,.08);}
+.acct-chip.geral{border-color:var(--accent3);color:var(--accent3);}
+.acct-chip.geral.active{background:rgba(168,85,247,.1);}
+.acct-chip .dot{width:6px;height:6px;border-radius:50%;}
+.acct-chip.active .dot{background:currentColor;}
+.acct-chip:not(.active) .dot{background:var(--muted);}
+.acct-add{padding:5px 10px;border-radius:20px;border:1px dashed var(--border2);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.acct-add:hover{border-color:var(--accent2);color:var(--accent2);}
+
+.main{flex:1;overflow-y:auto;padding:14px 16px 80px;}
+.main::-webkit-scrollbar{width:4px;} .main::-webkit-scrollbar-thumb{background:var(--border2);}
+
+.bottomnav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--s1);border-top:1px solid var(--border);z-index:100;}
+.bnav{flex:1;padding:10px 4px 12px;background:transparent;border:none;color:var(--muted);font-family:var(--mono);font-size:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .2s;letter-spacing:.5px;}
+.bnav .icon{font-size:17px;}
+.bnav.active{color:var(--accent);}
+.tab-pane{display:none;} .tab-pane.active{display:block;}
+
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.kpi{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi.c-green::before{background:var(--accent);}
+.kpi.c-blue::before{background:var(--accent2);}
+.kpi.c-red::before{background:var(--red);}
+.kpi.c-yellow::before{background:var(--yellow);}
+.kpi.c-purple::before{background:var(--accent3);}
+.kpi-label{font-size:9px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+.kpi-val{font-family:var(--head);font-size:20px;font-weight:700;}
+.green{color:var(--accent);} .red{color:var(--red);} .blue{color:var(--accent2);} .yellow{color:var(--yellow);} .purple{color:var(--accent3);}
+.kpi-sub{font-size:9px;color:var(--muted);margin-top:4px;}
+
+.sec{background:var(--s2);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);}
+.sec-title{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text);text-transform:uppercase;}
+.sec-badge{font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(0,255,179,.1);color:var(--accent);border:1px solid rgba(0,255,179,.2);}
+.sec-body{padding:14px;}
+
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:9px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;}
+.fg input,.fg select,.fg textarea{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;transition:border .2s;width:100%;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent2);}
+.fg select option{background:var(--s1);}
+.fg textarea{resize:vertical;min-height:120px;line-height:1.5;}
+
+.btn{padding:10px 14px;border:none;border-radius:9px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:all .2s;width:100%;}
+.btn-g{background:var(--accent);color:#07090f;} .btn-g:hover{opacity:.85;}
+.btn-b{background:var(--accent2);color:#fff;}
+.btn-p{background:linear-gradient(135deg,var(--accent2),var(--accent3));color:#fff;}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--muted2);} .btn-outline:hover{border-color:var(--accent2);color:var(--accent2);}
+.btn-red{background:var(--red);color:#fff;}
+.btn-row{display:flex;gap:8px;margin-top:10px;}
+.btn-row .btn{flex:1;}
+
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:10px;}
+thead th{background:var(--s3);color:var(--muted2);padding:8px 10px;text-align:left;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;}
+tbody tr{border-top:1px solid var(--border);cursor:pointer;}
+tbody tr:hover{background:rgba(255,255,255,.025);}
+tbody td{padding:8px 10px;white-space:nowrap;}
+
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8px;font-weight:700;letter-spacing:1px;}
+.tag-buy{background:rgba(0,255,179,.12);color:var(--accent);}
+.tag-sell{background:rgba(244,63,94,.12);color:var(--red);}
+.tag-src{background:rgba(168,85,247,.1);color:var(--accent3);border:1px solid rgba(168,85,247,.2);}
+.tag-man{background:rgba(251,146,60,.1);color:var(--orange);border:1px solid rgba(251,146,60,.2);}
+
+.prog-wrap{margin-bottom:12px;}
+.prog-label{display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-bottom:5px;}
+.prog-bar{height:5px;background:var(--s3);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:4px;transition:width .8s;}
+
+.chat-wrap{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:12px;padding-right:4px;}
+.chat-wrap::-webkit-scrollbar{width:3px;} .chat-wrap::-webkit-scrollbar-thumb{background:var(--border2);}
+.msg{padding:10px 13px;border-radius:12px;font-size:11px;line-height:1.6;max-width:92%;}
+.msg-ai{background:var(--s3);border:1px solid var(--border2);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;}
+.msg-user{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:var(--text);align-self:flex-end;border-bottom-right-radius:4px;}
+.chat-inp-row{display:flex;gap:8px;}
+.chat-inp{flex:1;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;}
+.chat-send{background:var(--accent2);border:none;border-radius:9px;width:40px;height:40px;cursor:pointer;color:#fff;font-size:15px;flex-shrink:0;}
+.typing{display:inline-flex;gap:4px;}
+.typing span{width:5px;height:5px;background:var(--muted2);border-radius:50%;animation:bonce 1.2s infinite;}
+.typing span:nth-child(2){animation-delay:.2s;} .typing span:nth-child(3){animation-delay:.4s;}
+@keyframes bonce{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-5px);}}
+
+.report-hint{font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.6;}
+.report-preview{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;color:var(--muted2);line-height:1.6;max-height:140px;overflow-y:auto;margin-top:8px;white-space:pre-wrap;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:var(--head);font-size:14px;font-weight:700;margin-bottom:16px;color:var(--accent);}
+.modal-close{float:right;background:none;border:none;color:var(--muted2);font-size:20px;cursor:pointer;line-height:1;}
+
+.empty{text-align:center;padding:24px;color:var(--muted);font-size:11px;line-height:1.7;}
+.empty .icon{font-size:28px;margin-bottom:8px;}
+
+.rlog-item{background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.rlog-head{display:flex;justify-content:space-between;margin-bottom:4px;}
+.rlog-date{font-size:10px;color:var(--accent);}
+.rlog-meta{font-size:9px;color:var(--muted2);}
+.rlog-body{font-size:10px;color:var(--muted2);line-height:1.5;}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:12px;font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+.pill-green{background:rgba(0,255,179,.1);color:var(--accent);}
+.pill-red{background:rgba(244,63,94,.1);color:var(--red);}
+.pill-blue{background:rgba(59,130,246,.1);color:var(--accent2);}
+.pill-purple{background:rgba(168,85,247,.1);color:var(--accent3);}
+
+.acct-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .2s;}
+.acct-card:hover{border-color:var(--accent2);}
+.acct-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.acct-card-name{font-family:var(--head);font-size:13px;font-weight:700;}
+.acct-card-meta{font-size:9px;color:var(--muted2);margin-top:2px;}
+.acct-card-bal{font-family:var(--head);font-size:16px;font-weight:700;}
+.acct-card-stats{display:flex;gap:10px;flex-wrap:wrap;font-size:9px;color:var(--muted2);}
+
+.asset-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.asset-row:last-child{border:none;}
+.asset-name{font-family:var(--head);font-weight:700;font-size:12px;}
+.asset-meta{font-size:9px;color:var(--muted2);}
+.asset-val{font-family:var(--mono);font-size:11px;text-align:right;}
+
+.divider{height:1px;background:var(--border);margin:12px 0;}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--s3);border:1px solid var(--accent);color:var(--accent);padding:10px 18px;border-radius:30px;font-size:11px;z-index:300;animation:slideUp .3s;}
+@keyframes slideUp{from{transform:translate(-50%,20px);opacity:0;}to{transform:translate(-50%,0);opacity:1;}}
+
+.danger-zone{background:rgba(244,63,94,.05);border:1px dashed rgba(244,63,94,.3);border-radius:8px;padding:10px;margin-top:10px;}
+
+/* PERIOD TABS */
+.period-tabs{display:flex;gap:4px;background:var(--s2);padding:4px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px;}
+.period-tab{flex:1;padding:8px;background:transparent;border:none;color:var(--muted2);font-family:var(--mono);font-size:10px;font-weight:600;cursor:pointer;border-radius:7px;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;}
+.period-tab.active{background:var(--accent3);color:#fff;}
+
+/* PERIOD ROW */
+.period-row{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.period-row-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer;}
+.period-row-date{font-family:var(--head);font-size:13px;font-weight:700;}
+.period-row-label{font-size:9px;color:var(--muted2);margin-top:2px;text-transform:uppercase;letter-spacing:1px;}
+.period-row-val{font-family:var(--head);font-size:15px;font-weight:700;text-align:right;}
+.period-row-sub{font-size:9px;color:var(--muted2);text-align:right;margin-top:2px;}
+.period-row-stats{display:flex;gap:8px;flex-wrap:wrap;font-size:9px;color:var(--muted2);margin-top:6px;padding-top:8px;border-top:1px solid var(--border);}
+.period-row-stats span{display:flex;align-items:center;gap:3px;}
+.period-row-detail{display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border2);}
+.period-row.expanded .period-row-detail{display:block;}
+.period-arrow{transition:transform .2s;color:var(--muted);font-size:10px;}
+.period-row.expanded .period-arrow{transform:rotate(90deg);}
+
+/* MINI BARS for period chart */
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:80px;padding:8px 0;margin-bottom:8px;}
+.mini-bar{flex:1;min-width:8px;border-radius:3px 3px 0 0;position:relative;transition:opacity .2s;cursor:pointer;}
+.mini-bar:hover{opacity:.7;}
+.mini-bar.pos{background:linear-gradient(180deg,var(--accent),rgba(0,255,179,.3));}
+.mini-bar.neg{background:linear-gradient(180deg,var(--red),rgba(244,63,94,.3));}
+.mini-bar.zero{background:var(--border2);height:2px!important;}
+
+.period-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+.period-summary-card{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.period-summary-label{font-size:8px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.period-summary-val{font-family:var(--head);font-size:14px;font-weight:700;}
+
+.acct-mini{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:10px;border-bottom:1px solid var(--border);}
+.acct-mini:last-child{border:none;}
+.acct-mini-name{color:var(--muted2);}
+.acct-mini-val{font-family:var(--mono);font-weight:600;}
+
+/* UPDATE / SYNC INDICATORS */
+.sync-banner{background:linear-gradient(90deg,rgba(168,85,247,.15),rgba(59,130,246,.15));border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:10px;color:var(--text);line-height:1.6;}
+.sync-banner strong{color:var(--accent3);}
+
+.update-log{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:10px;margin-top:8px;font-size:10px;line-height:1.6;}
+.update-log-item{padding:4px 0;border-bottom:1px dashed var(--border);}
+.update-log-item:last-child{border:none;}
+.update-log-item .field{color:var(--accent2);font-weight:700;}
+.update-log-item .old{color:var(--muted);text-decoration:line-through;}
+.update-log-item .new{color:var(--accent);}
+
+/* ARBITRAGE */
+.arb-pair-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
+.arb-pair-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.arb-pair-asset{font-family:var(--head);font-weight:700;font-size:13px;}
+.arb-pair-time{font-size:9px;color:var(--muted2);margin-top:3px;}
+.arb-pair-result{font-family:var(--head);font-size:15px;font-weight:700;text-align:right;}
+.arb-pair-spread{font-size:9px;color:var(--muted);}
+
+.arb-leg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}
+.arb-leg-box{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:10px;}
+.arb-leg-acct{font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.arb-leg-type{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px;}
+.arb-leg-price{font-family:var(--mono);font-size:11px;font-weight:700;}
+.arb-leg-result{font-family:var(--mono);font-size:12px;font-weight:700;margin-top:4px;}
+.arb-leg-meta{font-size:9px;color:var(--muted);margin-top:3px;}
+
+.arb-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;}
+.arb-metric{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px;text-align:center;}
+.arb-metric-label{font-size:8px;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase;}
+.arb-metric-val{font-family:var(--mono);font-size:11px;font-weight:700;margin-top:3px;}
+
+.arb-config{background:var(--s3);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:12px;}
+.arb-pair-select{display:flex;gap:8px;align-items:center;font-size:10px;}
+.arb-pair-select select{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text);font-family:var(--mono);font-size:11px;}
+.arb-arrow{color:var(--accent3);font-size:14px;}
+
+.slow-tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;background:rgba(251,146,60,.15);color:var(--orange);border:1px solid rgba(251,146,60,.3);letter-spacing:1px;}
+.fast-tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;background:rgba(0,255,179,.15);color:var(--accent);border:1px solid rgba(0,255,179,.3);letter-spacing:1px;}
+
+.duration-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:rgba(59,130,246,.1);color:var(--accent2);font-size:9px;font-weight:600;}
+
+/* SPREAD CONFIG */
+.spread-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--s3);border:1px solid var(--border2);border-radius:6px;margin-bottom:4px;font-size:10px;}
+.spread-row-info{display:flex;flex-direction:column;gap:2px;}
+.spread-row-asset{font-family:var(--head);font-weight:700;font-size:11px;color:var(--accent);}
+.spread-row-meta{font-size:9px;color:var(--muted2);}
+.spread-row-actions{display:flex;gap:4px;}
+.spread-mini-btn{background:transparent;border:1px solid var(--border2);color:var(--muted2);padding:3px 6px;border-radius:4px;font-size:9px;cursor:pointer;font-family:var(--mono);}
+.spread-mini-btn:hover{border-color:var(--red);color:var(--red);}
+
+.preset-pills{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;}
+.preset-pill{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:var(--accent3);padding:3px 8px;border-radius:12px;font-size:9px;cursor:pointer;font-family:var(--mono);transition:all .2s;}
+.preset-pill:hover{background:rgba(168,85,247,.2);}
+.preset-pill.broker-preset{background:rgba(0,255,179,.1);border-color:rgba(0,255,179,.4);color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <div class="logo">Forex<span>Desk</span></div>
+  <div class="top-actions">
+    <span id="cloud-indicator" style="font-size:11px;color:var(--accent2);opacity:0;transition:opacity .3s;"></span>
+    <span id="save-indicator" style="font-size:9px;color:var(--accent);opacity:0;transition:opacity .3s;letter-spacing:1px;"></span>
+    <button class="top-btn" onclick="openSettings()" title="Backup">⚙</button>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+</div>
+
+<div class="acct-bar" id="acct-bar"></div>
+
+<div class="main" id="main-content"></div>
+
+<nav class="bottomnav" id="bottomnav" style="display:none">
+  <button class="bnav active" onclick="showTab('dashboard',this)" data-tab="dashboard"><span class="icon">📊</span>Dashboard</button>
+  <button class="bnav" onclick="showTab('periodo',this)" data-tab="periodo"><span class="icon">📅</span>Período</button>
+  <button class="bnav" onclick="showTab('arbitragem',this)" data-tab="arbitragem"><span class="icon">🔗</span>Arbitragem</button>
+  <button class="bnav" onclick="showTab('relatorio',this)" data-tab="relatorio"><span class="icon">📨</span>Relatório</button>
+  <button class="bnav" onclick="showTab('historico',this)" data-tab="historico"><span class="icon">📋</span>Histórico</button>
+  <button class="bnav" onclick="showTab('custos',this)" data-tab="custos"><span class="icon">💸</span>Custos</button>
+  <button class="bnav" onclick="showTab('ia',this)" data-tab="ia"><span class="icon">🤖</span>IA</button>
+</nav>
+
+</div>
+
+<!-- MODAL: Nova Conta -->
+<div class="modal-overlay" id="modal-new-acct">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-new-acct')">✕</button>
+    <div class="modal-title">Nova Conta Forex</div>
+    <div class="fgrid">
+      <div class="fg" style="grid-column:1/-1"><label>Nome</label><input id="na-nome" placeholder="Ex: IC Markets - Prop 1"></div>
+      <div class="fg"><label>Corretora</label><input id="na-corretora" placeholder="IC Markets"></div>
+      <div class="fg"><label>Nº Conta</label><input id="na-numero" placeholder="12345678"></div>
+      <div class="fg"><label>Depósito Inicial ($)</label><input type="number" id="na-deposito" placeholder="1000"></div>
+      <div class="fg"><label>Moeda</label><select id="na-moeda"><option>USD</option><option>EUR</option><option>GBP</option><option>BRL</option></select></div>
+    </div>
+    <button class="btn btn-g" onclick="createAccount()">CRIAR CONTA</button>
+  </div>
+</div>
+
+<!-- MODAL: Editar Operação -->
+<div class="modal-overlay" id="modal-edit-op">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit-op')">✕</button>
+    <div class="modal-title">Editar Operação</div>
+    <input type="hidden" id="eo-id">
+    <div class="fgrid">
+      <div class="fg"><label>Par</label><input id="eo-par"></div>
+      <div class="fg"><label>Tipo</label><select id="eo-tipo"><option>BUY</option><option>SELL</option></select></div>
+      <div class="fg"><label>Lotes</label><input type="number" id="eo-lotes" step="0.01"></div>
+      <div class="fg"><label>Resultado ($)</label><input type="number" id="eo-res" step="0.01"></div>
+      <div class="fg"><label>Entrada</label><input id="eo-entrada"></div>
+      <div class="fg"><label>Saída</label><input id="eo-saida"></div>
+      <div class="fg"><label>Swap ($)</label><input type="number" id="eo-swap" step="0.01"></div>
+      <div class="fg"><label>Spread ($)</label><input type="number" id="eo-spread" step="0.01"></div>
+      <div class="fg"><label>Slippage (pips)</label><input type="number" id="eo-slip" step="0.1"></div>
+      <div class="fg"><label>Ticket ID</label><input id="eo-ticket"></div>
+      <div class="fg"><label>Abertura (datetime)</label><input id="eo-opentime" placeholder="2025-01-15 14:32:18"></div>
+      <div class="fg"><label>Fechamento (datetime)</label><input id="eo-closetime" placeholder="2025-01-15 14:34:55"></div>
+      <div class="fg" style="grid-column:1/-1"><label>Data</label><input type="date" id="eo-data"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-g" onclick="saveEditOp()">SALVAR</button>
+      <button class="btn btn-red" onclick="deleteOp()">EXCLUIR</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Configurações / Backup -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-settings')">✕</button>
+    <div class="modal-title">⚙ Configurações & Backup</div>
+
+    <div style="background:rgba(0,255,179,.05);border:1px solid rgba(0,255,179,.2);border-radius:8px;padding:10px;margin-bottom:14px;font-size:10px;color:var(--muted2);line-height:1.6">
+      💾 <strong style="color:var(--accent)">Salvamento automático ativo:</strong> Tudo é salvo no navegador a cada alteração. Para acessar de qualquer lugar e nunca perder, hospede o app online (peça ajuda no chat) ou faça <strong>backup diário</strong>.
+    </div>
+
+    <div style="font-size:11px;color:var(--accent2);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">☁️ Sync Multi-Dispositivo</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+      Sincronize dados entre celular, PC e tablet em <strong>tempo real</strong> via Upstash Redis. Use a MESMA User Key em todos dispositivos.
+    </div>
+    <div class="fg" style="margin-bottom:8px"><label>User Key (mínimo 8 caracteres, único e secreto)</label><input id="cloud-key" placeholder="ex: gabriel_kg7_2026" autocomplete="off"></div>
+    <div class="fg" style="margin-bottom:10px"><label>URL da API (deixe vazio se está no mesmo domínio)</label><input id="cloud-url" placeholder="https://seuapp.vercel.app/api/sync" autocomplete="off"></div>
+    <div class="btn-row">
+      <button class="btn btn-b" onclick="cloudUpload()">⬆ ENVIAR AGORA</button>
+      <button class="btn btn-g" onclick="cloudDownload()">⬇ BUSCAR AGORA</button>
+    </div>
+    <div class="fg" style="margin-top:10px">
+      <label>Auto-sync (a cada alteração)</label>
+      <select id="cloud-auto"><option value="off">Desativado</option><option value="on">Ativado</option></select>
+    </div>
+    <div id="cloud-status" style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;min-height:14px;"></div>
+
+    <div style="font-size:11px;color:var(--accent3);margin-top:18px;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">📏 Spread por Corretora</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+      Configure spread por <strong>cada conta</strong> (entre na conta → ⚙ Spread). Cada broker (XM, PuPrime, Exness, Bullex) tem spread próprio.
+    </div>
+
+    <div style="font-size:11px;color:var(--accent3);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">💾 Backup</div>
+    <button class="btn btn-g" onclick="exportBackup()" style="margin-bottom:8px">⬇ EXPORTAR BACKUP</button>
+    <label class="btn btn-b" style="display:block;text-align:center;margin-bottom:8px;cursor:pointer">
+      ⬆ IMPORTAR BACKUP
+      <input type="file" accept=".json" onchange="importBackup(event)" style="display:none">
+    </label>
+    <div class="fg" style="margin-top:12px">
+      <label>Auto-backup diário (download)</label>
+      <select id="auto-bk"><option value="off">Desativado</option><option value="on">Ativado</option></select>
+    </div>
+    <div class="danger-zone">
+      <div style="font-size:10px;color:var(--red);margin-bottom:8px;letter-spacing:1px">⚠ ZONA PERIGOSA</div>
+      <button class="btn btn-red" onclick="resetAll()">APAGAR TUDO</button>
+    </div>
+    <div style="font-size:9px;color:var(--muted);margin-top:12px;text-align:center;">
+      Último backup: <span id="last-backup">Nunca</span>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Spread por Corretora -->
+<div class="modal-overlay" id="modal-spread">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-spread')">✕</button>
+    <div class="modal-title">📏 Spread - <span id="sp-modal-acct"></span></div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Configure spread em pips/pontos por ativo desta corretora. Será aplicado automaticamente em cada operação importada.
+    </div>
+    <input type="hidden" id="sp-acct-id">
+    <div id="spread-config-list" style="margin-bottom:10px"></div>
+    <div class="fgrid" style="margin-bottom:8px">
+      <div class="fg"><label>Ativo</label><input id="sp-asset" placeholder="XAUUSD" style="text-transform:uppercase"></div>
+      <div class="fg"><label>Spread (pips/pts)</label><input type="number" id="sp-pips" placeholder="40" step="0.1"></div>
+      <div class="fg"><label>$ por pip × lote</label><input type="number" id="sp-pipval" placeholder="0.10" step="0.01"></div>
+      <div class="fg"><label>Comissão $/lote</label><input type="number" id="sp-comm" placeholder="0" step="0.01"></div>
+    </div>
+    <button class="btn btn-b" onclick="saveSpreadConfig()" style="margin-bottom:8px">+ ADICIONAR / ATUALIZAR ATIVO</button>
+    <button class="btn btn-p" onclick="recalcAccountSpreads()" style="margin-bottom:8px">🔄 RECALCULAR SPREAD DESTA CONTA</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+var DB = {
+  accounts: [],
+  activeAcct: null,
+  activeTab: 'dashboard',
+  lastBackup: null,
+  autoBackup: 'off'
+};
+
+var STORAGE_KEY = 'forexdesk_v3_data';
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+var SAVE_FAILED = false;
+
+function saveDB(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+    if(SAVE_FAILED){
+      SAVE_FAILED=false;
+      toast('✅ Salvamento restaurado');
+    }
+    flashSaveIndicator();
+    // Trigger cloud auto-sync if enabled
+    if(typeof triggerCloudAutoSync==='function') triggerCloudAutoSync();
+  }catch(e){
+    console.error('Storage error:',e);
+    if(!SAVE_FAILED){
+      SAVE_FAILED=true;
+      toast('⚠ Salvamento falhou! Faça backup manual.');
+    }
+  }
+}
+
+function flashSaveIndicator(){
+  var el=document.getElementById('save-indicator');
+  if(!el) return;
+  el.style.opacity='1';
+  el.textContent='✓ salvo';
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.style.opacity='0';},1500);
+}
+
+function loadDB(){
+  try{
+    var raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      var parsed=JSON.parse(raw);
+      DB=Object.assign(DB,parsed);
+    }
+  }catch(e){console.warn('Load failed');}
+}
+
+// ============================================================
+// CLOUD SYNC (Upstash Redis via Vercel API)
+// ============================================================
+var CLOUD_STATE={
+  uploading:false,
+  downloading:false,
+  pendingTimer:null,
+  lastSyncAt:null
+};
+
+function getCloudConfig(){
+  return {
+    key: DB.cloudKey||'',
+    url: DB.cloudUrl||(location.origin+'/api/sync'),
+    auto: DB.cloudAuto==='on'
+  };
+}
+
+function setCloudStatus(msg, color){
+  var el=document.getElementById('cloud-status');
+  if(el){
+    el.textContent=msg;
+    el.style.color=color||'var(--muted)';
+  }
+}
+
+function saveCloudSettings(){
+  DB.cloudKey=document.getElementById('cloud-key').value.trim();
+  DB.cloudUrl=document.getElementById('cloud-url').value.trim();
+  DB.cloudAuto=document.getElementById('cloud-auto').value;
+  saveDB();
+}
+
+async function cloudUpload(silent){
+  saveCloudSettings();
+  var cfg=getCloudConfig();
+  if(!cfg.key||cfg.key.length<8){
+    if(!silent) toast('⚠ User Key precisa de 8+ caracteres');
+    return;
+  }
+  if(CLOUD_STATE.uploading) return;
+  CLOUD_STATE.uploading=true;
+  if(!silent) setCloudStatus('⬆ Enviando para nuvem...', 'var(--accent2)');
+
+  try{
+    var res=await fetch(cfg.url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-User-Key':cfg.key},
+      body:JSON.stringify(DB)
+    });
+    var json=await res.json();
+    if(!res.ok) throw new Error(json.error||'Falha no upload');
+    CLOUD_STATE.lastSyncAt=new Date();
+    if(!silent){
+      setCloudStatus('✅ Enviado às '+CLOUD_STATE.lastSyncAt.toLocaleTimeString('pt-BR')+' ('+Math.round(json.size/1024)+'KB)', 'var(--accent)');
+      toast('☁️ Sincronizado');
+    }
+    flashCloudIndicator('up');
+  }catch(e){
+    console.error('Cloud upload error:',e);
+    setCloudStatus('❌ Erro: '+e.message, 'var(--red)');
+    if(!silent) toast('⚠ Sync falhou: '+e.message);
+  }
+  CLOUD_STATE.uploading=false;
+}
+
+async function cloudDownload(){
+  saveCloudSettings();
+  var cfg=getCloudConfig();
+  if(!cfg.key||cfg.key.length<8){
+    toast('⚠ User Key precisa de 8+ caracteres');
+    return;
+  }
+  if(!confirm('Buscar dados da nuvem substituirá TUDO no dispositivo atual. Continuar?')) return;
+  CLOUD_STATE.downloading=true;
+  setCloudStatus('⬇ Buscando da nuvem...', 'var(--accent2)');
+
+  try{
+    var res=await fetch(cfg.url, {
+      method:'GET',
+      headers:{'X-User-Key':cfg.key}
+    });
+    var json=await res.json();
+    if(!res.ok) throw new Error(json.error||'Falha no download');
+    if(!json.data){
+      setCloudStatus('Nenhum dado salvo na nuvem ainda. Faça upload primeiro.', 'var(--orange)');
+      CLOUD_STATE.downloading=false;
+      return;
+    }
+    var remoteData=json.data;
+    // Preserve cloud settings locally
+    var preservedCloud={cloudKey:DB.cloudKey,cloudUrl:DB.cloudUrl,cloudAuto:DB.cloudAuto};
+    DB=Object.assign({accounts:[],activeAcct:null,activeTab:'dashboard'},remoteData,preservedCloud);
+    saveDB();
+    setCloudStatus('✅ Baixado às '+new Date().toLocaleTimeString('pt-BR'), 'var(--accent)');
+    toast('☁️ Dados carregados da nuvem');
+    closeModal('modal-settings');
+    renderAcctBar();
+    if(DB.accounts.length>0){
+      if(!DB.activeAcct||(DB.activeAcct!=='__GERAL__'&&!getAcct())) DB.activeAcct=DB.accounts[0].id;
+      selectAccount(DB.activeAcct);
+    }else{
+      renderMain();
+    }
+    flashCloudIndicator('down');
+  }catch(e){
+    console.error('Cloud download error:',e);
+    setCloudStatus('❌ Erro: '+e.message, 'var(--red)');
+    toast('⚠ Download falhou: '+e.message);
+  }
+  CLOUD_STATE.downloading=false;
+}
+
+// Debounced auto-sync after every change
+function triggerCloudAutoSync(){
+  if(DB.cloudAuto!=='on') return;
+  if(!DB.cloudKey||DB.cloudKey.length<8) return;
+  clearTimeout(CLOUD_STATE.pendingTimer);
+  CLOUD_STATE.pendingTimer=setTimeout(function(){
+    cloudUpload(true);
+  }, 3000); // 3 seconds debounce
+}
+
+function flashCloudIndicator(dir){
+  var el=document.getElementById('cloud-indicator');
+  if(!el) return;
+  el.textContent=dir==='up'?'☁️↑':'☁️↓';
+  el.style.opacity='1';
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.style.opacity='0';}, 2000);
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function today(){ return new Date().toISOString().split('T')[0]; }
+function fmtS(n){ return (n>=0?'+':'')+n.toFixed(2); }
+function fmtP(n){ return (n>=0?'+':'')+n.toFixed(2)+'%'; }
+function getAcct(id){
+  if((id||DB.activeAcct)==='__GERAL__') return null;
+  return DB.accounts.find(function(a){return a.id===(id||DB.activeAcct);});
+}
+function isGeral(){ return DB.activeAcct==='__GERAL__'; }
+
+function toast(msg){
+  var t=document.createElement('div');
+  t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2500);
+}
+
+// ============================================================
+// SPREAD CONFIG (por CONTA/CORRETORA)
+// ============================================================
+var SPREAD_PRESETS = {
+  'XAUUSD': { pips: 30, pipValue: 0.10, comm: 0 },
+  'XAGUSD': { pips: 3, pipValue: 5.00, comm: 0 },
+  'EURUSD': { pips: 1.5, pipValue: 10.00, comm: 0 },
+  'GBPUSD': { pips: 2, pipValue: 10.00, comm: 0 },
+  'USDJPY': { pips: 1.5, pipValue: 10.00, comm: 0 },
+  'AUDUSD': { pips: 2, pipValue: 10.00, comm: 0 },
+  'USDCAD': { pips: 2, pipValue: 10.00, comm: 0 },
+  'NZDUSD': { pips: 2.5, pipValue: 10.00, comm: 0 },
+  'USDCHF': { pips: 2, pipValue: 10.00, comm: 0 },
+  'GBPJPY': { pips: 3, pipValue: 10.00, comm: 0 },
+  'US30': { pips: 3, pipValue: 1.00, comm: 0 },
+  'NAS100': { pips: 1.5, pipValue: 1.00, comm: 0 },
+  'SPX500': { pips: 0.5, pipValue: 1.00, comm: 0 },
+  'BTCUSD': { pips: 20, pipValue: 1.00, comm: 0 },
+  'ETHUSD': { pips: 5, pipValue: 1.00, comm: 0 }
+};
+
+// Presets por corretora (sugestões realistas que o usuário pode ajustar)
+var BROKER_PRESETS = {
+  'XM': { 'XAUUSD': { pips: 40, pipValue: 0.10, comm: 0 } },
+  'PUPRIME': { 'XAUUSD': { pips: 25, pipValue: 0.10, comm: 0 } },
+  'EXNESS': { 'XAUUSD': { pips: 22, pipValue: 0.10, comm: 0 } },
+  'BULLEX': { 'XAUUSD': { pips: 35, pipValue: 0.10, comm: 0 } },
+  'FBS': { 'XAUUSD': { pips: 28, pipValue: 0.10, comm: 0 } },
+  'POLARIUM': { 'XAUUSD': { pips: 30, pipValue: 0.10, comm: 0 } }
+};
+
+function openSpreadModal(acctId){
+  var a=DB.accounts.find(function(x){return x.id===acctId;});
+  if(!a) return;
+  if(!a.spreadConfig) a.spreadConfig={};
+  document.getElementById('sp-acct-id').value=acctId;
+  document.getElementById('sp-modal-acct').textContent=a.nome+(a.corretora?' ('+a.corretora+')':'');
+  renderSpreadList();
+  openModal('modal-spread');
+}
+
+function getCurrentSpreadAcct(){
+  var id=document.getElementById('sp-acct-id').value;
+  return DB.accounts.find(function(x){return x.id===id;});
+}
+
+function saveSpreadConfig(){
+  var a=getCurrentSpreadAcct(); if(!a) return;
+  if(!a.spreadConfig) a.spreadConfig={};
+  var asset=document.getElementById('sp-asset').value.trim().toUpperCase();
+  var pips=parseFloat(document.getElementById('sp-pips').value);
+  var pipVal=parseFloat(document.getElementById('sp-pipval').value);
+  var comm=parseFloat(document.getElementById('sp-comm').value)||0;
+  if(!asset||isNaN(pips)||isNaN(pipVal)) return alert('Preencha ativo, pips e $ por pip.');
+  a.spreadConfig[asset]={pips:pips,pipValue:pipVal,comm:comm};
+  saveDB();
+  document.getElementById('sp-asset').value='';
+  document.getElementById('sp-pips').value='';
+  document.getElementById('sp-pipval').value='';
+  document.getElementById('sp-comm').value='';
+  renderSpreadList();
+  toast('✅ '+asset+' salvo em '+a.nome);
+}
+
+function deleteSpreadConfig(asset){
+  var a=getCurrentSpreadAcct(); if(!a||!a.spreadConfig) return;
+  if(!confirm('Remover '+asset+' de '+a.nome+'?')) return;
+  delete a.spreadConfig[asset];
+  saveDB();
+  renderSpreadList();
+  toast('🗑 Removido');
+}
+
+function loadPreset(asset){
+  var a=getCurrentSpreadAcct();
+  var brokerKey=a&&a.corretora?a.corretora.toUpperCase().replace(/[^A-Z]/g,''):'';
+  var preset=(BROKER_PRESETS[brokerKey]&&BROKER_PRESETS[brokerKey][asset])||SPREAD_PRESETS[asset];
+  if(!preset) return;
+  document.getElementById('sp-asset').value=asset;
+  document.getElementById('sp-pips').value=preset.pips;
+  document.getElementById('sp-pipval').value=preset.pipValue;
+  document.getElementById('sp-comm').value=preset.comm;
+}
+
+function loadConfigEdit(asset){
+  var a=getCurrentSpreadAcct(); if(!a||!a.spreadConfig||!a.spreadConfig[asset]) return;
+  var c=a.spreadConfig[asset];
+  document.getElementById('sp-asset').value=asset;
+  document.getElementById('sp-pips').value=c.pips;
+  document.getElementById('sp-pipval').value=c.pipValue;
+  document.getElementById('sp-comm').value=c.comm||0;
+}
+
+function renderSpreadList(){
+  var a=getCurrentSpreadAcct(); if(!a) return;
+  if(!a.spreadConfig) a.spreadConfig={};
+  var list=document.getElementById('spread-config-list');
+  if(!list) return;
+  var configured=Object.keys(a.spreadConfig);
+  var brokerKey=a.corretora?a.corretora.toUpperCase().replace(/[^A-Z]/g,''):'';
+  var brokerHint='';
+  if(BROKER_PRESETS[brokerKey]){
+    brokerHint='<div style="font-size:9px;color:var(--accent3);margin-bottom:6px;padding:6px 8px;background:rgba(168,85,247,.08);border-radius:6px">💡 Presets sugeridos para <strong>'+a.corretora+'</strong>:</div>';
+  }
+  var presetsHtml=brokerHint+'<div class="preset-pills">';
+  var unusedPresets=Object.keys(SPREAD_PRESETS).filter(function(k){return !a.spreadConfig[k];}).slice(0,10);
+  unusedPresets.forEach(function(k){
+    var isBrokerPreset=BROKER_PRESETS[brokerKey]&&BROKER_PRESETS[brokerKey][k];
+    presetsHtml+='<button class="preset-pill'+(isBrokerPreset?' broker-preset':'')+'" onclick="loadPreset(\''+k+'\')">'+(isBrokerPreset?'⭐ ':'+')+' '+k+'</button>';
+  });
+  presetsHtml+='</div>';
+  if(configured.length===0){
+    list.innerHTML=presetsHtml+'<div style="font-size:10px;color:var(--muted);text-align:center;padding:8px">Nenhum ativo configurado nesta corretora.</div>';
+    return;
+  }
+  list.innerHTML=presetsHtml+configured.map(function(asset){
+    var c=a.spreadConfig[asset];
+    var perLot=(c.pips*c.pipValue+(c.comm||0)).toFixed(2);
+    return '<div class="spread-row"><div class="spread-row-info"><span class="spread-row-asset">'+asset+'</span><span class="spread-row-meta">'+c.pips+' pips × $'+c.pipValue+'/pip'+(c.comm>0?' + $'+c.comm+' comm':'')+' = <strong style="color:var(--red)">$'+perLot+'/lote</strong></span></div><div class="spread-row-actions"><button class="spread-mini-btn" onclick="loadConfigEdit(\''+asset+'\')">edit</button><button class="spread-mini-btn" onclick="deleteSpreadConfig(\''+asset+'\')">✕</button></div></div>';
+  }).join('');
+}
+
+function calculateOpSpread(op, account){
+  if(!account||!account.spreadConfig) return 0;
+  var c=account.spreadConfig[op.par];
+  if(!c) return 0;
+  return (c.pips*c.pipValue+(c.comm||0))*(op.lotes||0);
+}
+
+function recalcAccountSpreads(){
+  var a=getCurrentSpreadAcct(); if(!a) return;
+  if(!a.spreadConfig||Object.keys(a.spreadConfig).length===0) return alert('Configure pelo menos um ativo antes.');
+  if(!confirm('Recalcular spread de TODAS operações de '+a.nome+'?')) return;
+  var updated=0, skipped=0;
+  a.operacoes.forEach(function(op){
+    var calc=calculateOpSpread(op, a);
+    if(calc>0){
+      op.spread=calc;
+      op.spreadCalculated=true;
+      updated++;
+    }else{
+      skipped++;
+    }
+  });
+  saveDB();
+  closeModal('modal-spread');
+  renderMain();
+  toast('✅ '+updated+' ops recalculadas ('+skipped+' sem config)');
+}
+
+
+function openSettings(){
+  document.getElementById('last-backup').textContent=DB.lastBackup||'Nunca';
+  document.getElementById('auto-bk').value=DB.autoBackup||'off';
+  document.getElementById('cloud-key').value=DB.cloudKey||'';
+  document.getElementById('cloud-url').value=DB.cloudUrl||'';
+  document.getElementById('cloud-auto').value=DB.cloudAuto||'off';
+  openModal('modal-settings');
+}
+
+function exportBackup(){
+  var data=JSON.stringify(DB,null,2);
+  var blob=new Blob([data],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var date=new Date().toISOString().split('T')[0];
+  a.href=url;a.download='forexdesk_backup_'+date+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  URL.revokeObjectURL(url);
+  DB.lastBackup=new Date().toLocaleString('pt-BR');
+  saveDB();
+  document.getElementById('last-backup').textContent=DB.lastBackup;
+  toast('✅ Backup exportado');
+}
+
+function importBackup(e){
+  var file=e.target.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var data=JSON.parse(ev.target.result);
+      if(!data.accounts) return alert('Arquivo inválido.');
+      if(!confirm('Importar backup substituirá todos os dados atuais. Continuar?')) return;
+      DB=Object.assign(DB,data);
+      saveDB();
+      renderAcctBar();
+      if(DB.accounts.length>0) selectAccount(DB.activeAcct||'__GERAL__');
+      closeModal('modal-settings');
+      toast('✅ Backup importado');
+    }catch(err){alert('Erro ao ler arquivo: '+err.message);}
+  };
+  reader.readAsText(file);
+}
+
+function resetAll(){
+  if(!confirm('TEM CERTEZA? Isso apagará TODAS as contas e dados.')) return;
+  if(!confirm('Última confirmação. Apagar tudo?')) return;
+  DB={accounts:[],activeAcct:null,activeTab:'dashboard',lastBackup:null,autoBackup:'off'};
+  saveDB();
+  renderAcctBar();
+  document.getElementById('main-content').innerHTML='';
+  document.getElementById('bottomnav').style.display='none';
+  closeModal('modal-settings');
+  toast('🗑 Dados apagados');
+  renderMain();
+}
+
+// Auto-backup check on load
+function checkAutoBackup(){
+  if(DB.autoBackup!=='on') return;
+  var last=DB.lastBackup?new Date(DB.lastBackup).toISOString().split('T')[0]:null;
+  if(last!==today()&&DB.accounts.length>0){
+    setTimeout(function(){
+      if(confirm('🔔 Auto-backup: baixar backup de hoje?')) exportBackup();
+    },1500);
+  }
+}
+
+// ============================================================
+// ACCOUNTS
+// ============================================================
+function openNewAcct(){ openModal('modal-new-acct'); }
+
+function createAccount(){
+  var nome=document.getElementById('na-nome').value.trim();
+  if(!nome) return alert('Nome obrigatório.');
+  var dep=parseFloat(document.getElementById('na-deposito').value)||0;
+  var acct={
+    id:uid(), nome:nome,
+    corretora:document.getElementById('na-corretora').value.trim(),
+    numero:document.getElementById('na-numero').value.trim(),
+    moeda:document.getElementById('na-moeda').value,
+    depositos:dep>0?[{id:uid(),valor:dep,data:today()}]:[],
+    operacoes:[], custos:[], reports:[]
+  };
+  DB.accounts.push(acct);
+  saveDB();
+  closeModal('modal-new-acct');
+  ['na-nome','na-corretora','na-numero','na-deposito'].forEach(function(id){document.getElementById(id).value='';});
+  renderAcctBar();
+  selectAccount(acct.id);
+}
+
+function selectAccount(id){
+  DB.activeAcct=id;
+  DB.activeTab='dashboard';
+  saveDB();
+  renderAcctBar();
+  renderMain();
+  document.getElementById('bottomnav').style.display='flex';
+  document.querySelectorAll('.bnav').forEach(function(b){
+    b.classList.toggle('active',b.dataset.tab==='dashboard');
+  });
+  // Hide non-relevant tabs for GERAL
+  document.querySelectorAll('.bnav').forEach(function(b){
+    if(isGeral()){
+      b.style.display=(b.dataset.tab==='dashboard'||b.dataset.tab==='periodo'||b.dataset.tab==='arbitragem'||b.dataset.tab==='ia')?'flex':'none';
+    }else{
+      b.style.display=(b.dataset.tab==='periodo'||b.dataset.tab==='arbitragem')?'none':'flex';
+    }
+  });
+}
+
+function renderAcctBar(){
+  var bar=document.getElementById('acct-bar');
+  bar.innerHTML='';
+  if(DB.accounts.length>0){
+    var ger=document.createElement('div');
+    ger.className='acct-chip geral'+(DB.activeAcct==='__GERAL__'?' active':'');
+    ger.innerHTML='<div class="dot"></div>🌐 GERAL';
+    ger.onclick=function(){selectAccount('__GERAL__');};
+    bar.appendChild(ger);
+  }
+  DB.accounts.forEach(function(a){
+    var chip=document.createElement('div');
+    chip.className='acct-chip'+(a.id===DB.activeAcct?' active':'');
+    chip.innerHTML='<div class="dot"></div>'+a.nome;
+    chip.onclick=function(){selectAccount(a.id);};
+    bar.appendChild(chip);
+  });
+  var add=document.createElement('button');
+  add.className='acct-add';
+  add.innerHTML='+ Nova Conta';
+  add.onclick=openNewAcct;
+  bar.appendChild(add);
+}
+
+// ============================================================
+// STATS
+// ============================================================
+function calcStats(a){
+  if(!a) return null;
+  var totalDep=a.depositos.reduce(function(s,d){return s+d.valor;},0);
+  var totalRes=a.operacoes.reduce(function(s,o){return s+o.resultado;},0);
+  var totalSwap=a.operacoes.reduce(function(s,o){return s+(o.swap||0);},0);
+  var totalSpread=a.operacoes.reduce(function(s,o){return s+(o.spread||0);},0);
+  var totalCustosExtra=a.custos.filter(function(c){return c.obs!=='Auto (relatório)'&&c.obs!=='Auto (op manual)';}).reduce(function(s,c){return s+c.valor;},0);
+  var totalCustos=totalSwap+totalSpread+totalCustosExtra;
+  var lucroLiq=totalRes;
+  var saldo=totalDep+lucroLiq;
+  var totalLotes=a.operacoes.reduce(function(s,o){return s+(o.lotes||0);},0);
+  var wins=a.operacoes.filter(function(o){return o.resultado>0;}).length;
+  var losses=a.operacoes.filter(function(o){return o.resultado<0;}).length;
+  var wr=a.operacoes.length>0?(wins/a.operacoes.length*100):0;
+  var roi=totalDep>0?(lucroLiq/totalDep*100):0;
+  var avgWin=wins>0?a.operacoes.filter(function(o){return o.resultado>0;}).reduce(function(s,o){return s+o.resultado;},0)/wins:0;
+  var avgLoss=losses>0?a.operacoes.filter(function(o){return o.resultado<0;}).reduce(function(s,o){return s+o.resultado;},0)/losses:0;
+  var rr=avgLoss!==0?Math.abs(avgWin/avgLoss):0;
+  // Por ativo
+  var byAsset={};
+  a.operacoes.forEach(function(o){
+    if(!byAsset[o.par]) byAsset[o.par]={count:0,lotes:0,res:0,wins:0};
+    byAsset[o.par].count++;
+    byAsset[o.par].lotes+=o.lotes||0;
+    byAsset[o.par].res+=o.resultado;
+    if(o.resultado>0) byAsset[o.par].wins++;
+  });
+  return {totalDep,totalRes,totalSwap,totalSpread,totalCustos,lucroLiq,saldo,totalLotes,wins,losses,wr,roi,avgWin,avgLoss,rr,count:a.operacoes.length,byAsset};
+}
+
+function calcGeralStats(){
+  var totalDep=0,totalRes=0,totalSwap=0,totalSpread=0,totalCustos=0,totalOps=0,totalLotes=0,totalWins=0,totalLosses=0;
+  var byAcct=[];
+  var byAsset={};
+  DB.accounts.forEach(function(a){
+    var s=calcStats(a);
+    totalDep+=s.totalDep;totalRes+=s.totalRes;totalSwap+=s.totalSwap;totalSpread+=s.totalSpread;
+    totalCustos+=s.totalCustos;totalOps+=s.count;totalLotes+=s.totalLotes;totalWins+=s.wins;totalLosses+=s.losses;
+    byAcct.push({acct:a,stats:s});
+    Object.keys(s.byAsset).forEach(function(p){
+      if(!byAsset[p]) byAsset[p]={count:0,lotes:0,res:0,wins:0};
+      byAsset[p].count+=s.byAsset[p].count;
+      byAsset[p].lotes+=s.byAsset[p].lotes;
+      byAsset[p].res+=s.byAsset[p].res;
+      byAsset[p].wins+=s.byAsset[p].wins;
+    });
+  });
+  var saldo=totalDep+totalRes;
+  var wr=totalOps>0?(totalWins/totalOps*100):0;
+  var roi=totalDep>0?(totalRes/totalDep*100):0;
+  return {totalDep,totalRes,totalSwap,totalSpread,totalCustos,saldo,totalLotes,totalWins,totalLosses,totalOps,wr,roi,byAcct,byAsset};
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function renderMain(){
+  if(DB.accounts.length===0){
+    document.getElementById('main-content').innerHTML='<div class="empty" style="margin-top:60px"><div class="icon">📂</div>Nenhuma conta criada ainda.<br>Clique em <strong>+ Nova Conta</strong> para começar.</div>';
+    document.getElementById('bottomnav').style.display='none';
+    return;
+  }
+  if(!DB.activeAcct||(DB.activeAcct!=='__GERAL__'&&!getAcct())){
+    DB.activeAcct=DB.accounts[0].id;
+  }
+  var panes=['dashboard','periodo','arbitragem','relatorio','historico','custos','ia'];
+  document.getElementById('main-content').innerHTML=panes.map(function(p){
+    return '<div id="pane-'+p+'" class="tab-pane'+(p===DB.activeTab?' active':'')+'"></div>';
+  }).join('');
+  renderDashboard();
+  if(isGeral()){
+    renderPeriodo();
+    renderArbitragem();
+  }else{
+    renderRelatorio();
+    renderHistorico();
+    renderCustos();
+  }
+  renderIA();
+}
+
+function showTab(name,el){
+  if(isGeral()&&name!=='dashboard'&&name!=='periodo'&&name!=='arbitragem'&&name!=='ia'){
+    toast('Aba disponível apenas em contas individuais');
+    return;
+  }
+  if(!isGeral()&&(name==='periodo'||name==='arbitragem')){
+    toast('Aba disponível apenas na visão Geral');
+    return;
+  }
+  DB.activeTab=name;
+  saveDB();
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
+  var pane=document.getElementById('pane-'+name);
+  if(pane) pane.classList.add('active');
+  document.querySelectorAll('.bnav').forEach(function(b){b.classList.remove('active');});
+  if(el) el.classList.add('active');
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard(){
+  var pane=document.getElementById('pane-dashboard'); if(!pane) return;
+  if(isGeral()){ renderGeralDashboard(pane); return; }
+  var a=getAcct(); if(!a) return;
+  var s=calcStats(a);
+  var assets=Object.entries(s.byAsset).sort(function(x,y){return y[1].res-x[1].res;});
+
+  pane.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi c-blue"><div class="kpi-label">Saldo</div><div class="kpi-val blue">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">Dep: $${s.totalDep.toFixed(2)}</div></div>
+      <div class="kpi c-${s.lucroLiq>=0?'green':'red'}"><div class="kpi-label">Resultado</div><div class="kpi-val ${s.lucroLiq>=0?'green':'red'}">${fmtS(s.lucroLiq)}</div><div class="kpi-sub">ROI: ${fmtP(s.roi)}</div></div>
+      <div class="kpi c-yellow"><div class="kpi-label">Lotes</div><div class="kpi-val yellow">${s.totalLotes.toFixed(2)}</div><div class="kpi-sub">${s.count} ops</div></div>
+      <div class="kpi c-red"><div class="kpi-label">Custos</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">Spread+Swap</div></div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Performance</span><div style="display:flex;gap:6px;align-items:center"><span class="sec-badge">${a.corretora||'Conta'}</span><button class="spread-mini-btn" onclick="openSpreadModal('${a.id}')" title="Configurar Spread">📏</button></div></div>
+      <div class="sec-body">
+        <div class="prog-wrap"><div class="prog-label"><span>Win Rate</span><span>${s.wr.toFixed(1)}%</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(s.wr,100)}%;background:var(--accent)"></div></div></div>
+        <div class="prog-wrap"><div class="prog-label"><span>ROI</span><span>${Math.max(0,s.roi).toFixed(1)}%</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(Math.max(s.roi,0),100)}%;background:var(--accent2)"></div></div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <span class="pill pill-green">W: ${s.wins}</span><span class="pill pill-red">L: ${s.losses}</span><span class="pill pill-blue">R:R ${s.rr.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Por Ativo</span><span class="sec-badge">${assets.length}</span></div>
+      <div class="sec-body">
+        ${assets.length===0?'<div class="empty">Nenhuma operação ainda.</div>':
+        assets.map(function(e){var p=e[0],d=e[1];var awr=d.count>0?(d.wins/d.count*100).toFixed(0):0;
+          return '<div class="asset-row"><div><div class="asset-name">'+p+'</div><div class="asset-meta">'+d.count+' ops • '+d.lotes.toFixed(2)+' lotes • WR '+awr+'%</div></div><div class="asset-val '+(d.res>=0?'green':'red')+'">'+fmtS(d.res)+'</div></div>';
+        }).join('')}
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Depósitos</span><span class="sec-badge">${a.depositos.length}</span></div>
+      <div class="sec-body">
+        <div class="fgrid">
+          <div class="fg"><label>Valor ($)</label><input type="number" id="dep-val" placeholder="1000"></div>
+          <div class="fg"><label>Data</label><input type="date" id="dep-dt" value="${today()}"></div>
+        </div>
+        <button class="btn btn-g" onclick="addDeposito()">+ DEPÓSITO</button>
+        <div style="margin-top:10px">
+          ${a.depositos.slice().reverse().map(function(d){return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:10px"><span style="color:var(--muted2)">'+d.data+'</span><span style="color:var(--accent)">+$'+d.valor.toFixed(2)+'</span></div>';}).join('')||'<div class="empty" style="padding:12px 0">Nenhum depósito.</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderGeralDashboard(pane){
+  var s=calcGeralStats();
+  var assets=Object.entries(s.byAsset).sort(function(x,y){return y[1].res-x[1].res;});
+  pane.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi c-purple"><div class="kpi-label">🌐 Saldo Total</div><div class="kpi-val purple">$${s.saldo.toFixed(2)}</div><div class="kpi-sub">${DB.accounts.length} contas</div></div>
+      <div class="kpi c-${s.totalRes>=0?'green':'red'}"><div class="kpi-label">Resultado Total</div><div class="kpi-val ${s.totalRes>=0?'green':'red'}">${fmtS(s.totalRes)}</div><div class="kpi-sub">ROI: ${fmtP(s.roi)}</div></div>
+      <div class="kpi c-blue"><div class="kpi-label">Capital Investido</div><div class="kpi-val blue">$${s.totalDep.toFixed(2)}</div><div class="kpi-sub">Soma depósitos</div></div>
+      <div class="kpi c-yellow"><div class="kpi-label">Total Lotes</div><div class="kpi-val yellow">${s.totalLotes.toFixed(2)}</div><div class="kpi-sub">${s.totalOps} ops</div></div>
+      <div class="kpi c-red"><div class="kpi-label">Custos Totais</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">Swap+Spread</div></div>
+      <div class="kpi c-green"><div class="kpi-label">Win Rate Geral</div><div class="kpi-val green">${s.wr.toFixed(1)}%</div><div class="kpi-sub">W:${s.totalWins} L:${s.totalLosses}</div></div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Contas</span><span class="sec-badge">${DB.accounts.length}</span></div>
+      <div class="sec-body">
+        ${s.byAcct.sort(function(a,b){return b.stats.lucroLiq-a.stats.lucroLiq;}).map(function(x){
+          var a=x.acct,st=x.stats;
+          return '<div class="acct-card" onclick="selectAccount(\''+a.id+'\')">'+
+            '<div class="acct-card-top"><div><div class="acct-card-name">'+a.nome+'</div><div class="acct-card-meta">'+(a.corretora||'')+' '+(a.numero||'')+'</div></div>'+
+            '<div style="text-align:right"><div class="acct-card-bal '+(st.lucroLiq>=0?'green':'red')+'">'+fmtS(st.lucroLiq)+'</div><div class="acct-card-meta">Saldo: $'+st.saldo.toFixed(2)+'</div></div></div>'+
+            '<div class="acct-card-stats"><span>📊 '+st.count+' ops</span><span>🎯 WR '+st.wr.toFixed(0)+'%</span><span>📦 '+st.totalLotes.toFixed(2)+' lotes</span><span>💸 $'+st.totalCustos.toFixed(2)+'</span></div></div>';
+        }).join('')}
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Por Ativo (Consolidado)</span><span class="sec-badge">${assets.length}</span></div>
+      <div class="sec-body">
+        ${assets.length===0?'<div class="empty">Nenhuma operação ainda.</div>':
+        assets.map(function(e){var p=e[0],d=e[1];var awr=d.count>0?(d.wins/d.count*100).toFixed(0):0;
+          return '<div class="asset-row"><div><div class="asset-name">'+p+'</div><div class="asset-meta">'+d.count+' ops • '+d.lotes.toFixed(2)+' lotes • WR '+awr+'%</div></div><div class="asset-val '+(d.res>=0?'green':'red')+'">'+fmtS(d.res)+'</div></div>';
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function addDeposito(){
+  var a=getAcct(); if(!a) return;
+  var v=parseFloat(document.getElementById('dep-val').value);
+  if(!v||v<=0) return alert('Valor inválido.');
+  a.depositos.push({id:uid(),valor:v,data:document.getElementById('dep-dt').value||today()});
+  saveDB();
+  renderDashboard();
+  toast('✅ Depósito registrado');
+}
+
+// ============================================================
+// PERÍODO (Daily / Semana / Mês)
+// ============================================================
+var periodMode = 'daily';
+
+function renderPeriodo(){
+  var pane=document.getElementById('pane-periodo'); if(!pane) return;
+
+  // Collect ALL operations from ALL accounts
+  var allOps=[];
+  DB.accounts.forEach(function(a){
+    a.operacoes.forEach(function(o){
+      allOps.push(Object.assign({},o,{acctId:a.id,acctName:a.nome}));
+    });
+  });
+
+  if(allOps.length===0){
+    pane.innerHTML='<div class="empty" style="margin-top:40px"><div class="icon">📅</div>Nenhuma operação ainda em nenhuma conta.<br>Importe relatórios para ver análise temporal.</div>';
+    return;
+  }
+
+  // Group by selected period
+  var groups = groupOpsByPeriod(allOps, periodMode);
+  var sortedKeys = Object.keys(groups).sort().reverse(); // most recent first
+
+  // Totals
+  var totalRes=0,totalLotes=0,totalOps=0,wins=0;
+  sortedKeys.forEach(function(k){
+    groups[k].ops.forEach(function(o){
+      totalRes+=o.resultado; totalLotes+=o.lotes||0; totalOps++;
+      if(o.resultado>0) wins++;
+    });
+  });
+  var wr=totalOps>0?(wins/totalOps*100):0;
+
+  // Best/Worst period
+  var sortedByRes=Object.entries(groups).sort(function(a,b){return b[1].resultado-a[1].resultado;});
+  var best=sortedByRes[0];
+  var worst=sortedByRes[sortedByRes.length-1];
+
+  // Mini chart bars
+  var chartKeys = Object.keys(groups).sort().slice(-20); // last 20 periods chronological
+  var maxAbs = Math.max.apply(null, chartKeys.map(function(k){return Math.abs(groups[k].resultado);}));
+  if(maxAbs===0) maxAbs=1;
+
+  var labels = { daily:'Diário', weekly:'Semanal', monthly:'Mensal' };
+
+  pane.innerHTML=`
+    <div class="period-tabs">
+      <button class="period-tab${periodMode==='daily'?' active':''}" onclick="setPeriodMode('daily')">📅 Diário</button>
+      <button class="period-tab${periodMode==='weekly'?' active':''}" onclick="setPeriodMode('weekly')">📆 Semanal</button>
+      <button class="period-tab${periodMode==='monthly'?' active':''}" onclick="setPeriodMode('monthly')">🗓 Mensal</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi c-${totalRes>=0?'green':'red'}"><div class="kpi-label">Resultado Total</div><div class="kpi-val ${totalRes>=0?'green':'red'}">${fmtS(totalRes)}</div><div class="kpi-sub">${sortedKeys.length} períodos</div></div>
+      <div class="kpi c-yellow"><div class="kpi-label">Operações</div><div class="kpi-val yellow">${totalOps}</div><div class="kpi-sub">WR ${wr.toFixed(1)}%</div></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">📊 Evolução ${labels[periodMode]}</span><span class="sec-badge">Últimos ${chartKeys.length}</span></div>
+      <div class="sec-body">
+        <div class="mini-chart">
+          ${chartKeys.map(function(k){
+            var g=groups[k];
+            var h=Math.abs(g.resultado)/maxAbs*100;
+            var cls=g.resultado>0?'pos':(g.resultado<0?'neg':'zero');
+            return '<div class="mini-bar '+cls+'" style="height:'+Math.max(h,5)+'%" title="'+formatPeriodLabel(k,periodMode)+': '+fmtS(g.resultado)+'"></div>';
+          }).join('')}
+        </div>
+        <div class="period-summary">
+          <div class="period-summary-card">
+            <div class="period-summary-label">🏆 Melhor</div>
+            <div class="period-summary-val green">${fmtS(best[1].resultado)}</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px">${formatPeriodLabel(best[0],periodMode)}</div>
+          </div>
+          <div class="period-summary-card">
+            <div class="period-summary-label">📉 Pior</div>
+            <div class="period-summary-val red">${fmtS(worst[1].resultado)}</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px">${formatPeriodLabel(worst[0],periodMode)}</div>
+          </div>
+          <div class="period-summary-card">
+            <div class="period-summary-label">Média</div>
+            <div class="period-summary-val ${totalRes/sortedKeys.length>=0?'green':'red'}">${fmtS(totalRes/sortedKeys.length)}</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px">por período</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">${labels[periodMode]} (todas contas)</span><span class="sec-badge">${sortedKeys.length}</span></div>
+      <div class="sec-body" style="padding:10px">
+        ${sortedKeys.map(function(k){return renderPeriodRow(k, groups[k], periodMode);}).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function setPeriodMode(mode){
+  periodMode=mode;
+  renderPeriodo();
+}
+
+function groupOpsByPeriod(ops, mode){
+  var groups={};
+  ops.forEach(function(o){
+    if(!o.data) return;
+    var key=getPeriodKey(o.data, mode);
+    if(!groups[key]) groups[key]={ops:[],resultado:0,lotes:0,swap:0,spread:0,wins:0,losses:0,byAcct:{},byAsset:{}};
+    var g=groups[key];
+    g.ops.push(o);
+    g.resultado+=o.resultado;
+    g.lotes+=o.lotes||0;
+    g.swap+=o.swap||0;
+    g.spread+=o.spread||0;
+    if(o.resultado>0) g.wins++;
+    else if(o.resultado<0) g.losses++;
+    // By account
+    if(!g.byAcct[o.acctName]) g.byAcct[o.acctName]={resultado:0,count:0};
+    g.byAcct[o.acctName].resultado+=o.resultado;
+    g.byAcct[o.acctName].count++;
+    // By asset
+    if(!g.byAsset[o.par]) g.byAsset[o.par]={resultado:0,count:0,lotes:0};
+    g.byAsset[o.par].resultado+=o.resultado;
+    g.byAsset[o.par].count++;
+    g.byAsset[o.par].lotes+=o.lotes||0;
+  });
+  return groups;
+}
+
+function getPeriodKey(dateStr, mode){
+  var d=new Date(dateStr+'T12:00:00');
+  if(mode==='daily') return dateStr;
+  if(mode==='weekly'){
+    // ISO week
+    var tmp=new Date(d);
+    tmp.setHours(0,0,0,0);
+    tmp.setDate(tmp.getDate()+3-(tmp.getDay()+6)%7);
+    var week1=new Date(tmp.getFullYear(),0,4);
+    var weekNum=1+Math.round(((tmp-week1)/86400000-3+(week1.getDay()+6)%7)/7);
+    return tmp.getFullYear()+'-W'+String(weekNum).padStart(2,'0');
+  }
+  if(mode==='monthly'){
+    return dateStr.slice(0,7); // YYYY-MM
+  }
+  return dateStr;
+}
+
+function formatPeriodLabel(key, mode){
+  if(mode==='daily'){
+    var d=new Date(key+'T12:00:00');
+    var dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    return dias[d.getDay()]+' '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  }
+  if(mode==='weekly'){
+    var parts=key.split('-W');
+    return 'Semana '+parts[1]+' / '+parts[0];
+  }
+  if(mode==='monthly'){
+    var d=new Date(key+'-15T12:00:00');
+    var meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return meses[d.getMonth()]+' '+d.getFullYear();
+  }
+  return key;
+}
+
+function renderPeriodRow(key, g, mode){
+  var wr=g.ops.length>0?(g.wins/g.ops.length*100).toFixed(0):0;
+  var acctList=Object.entries(g.byAcct).sort(function(a,b){return b[1].resultado-a[1].resultado;});
+  var assetList=Object.entries(g.byAsset).sort(function(a,b){return b[1].resultado-a[1].resultado;});
+  return `
+    <div class="period-row" id="pr-${key}">
+      <div class="period-row-head" onclick="togglePeriodRow('${key}')">
+        <div>
+          <div class="period-row-date">${formatPeriodLabel(key, mode)}</div>
+          <div class="period-row-label">${g.ops.length} ops • ${g.lotes.toFixed(2)} lotes</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div>
+            <div class="period-row-val ${g.resultado>=0?'green':'red'}">${fmtS(g.resultado)}</div>
+            <div class="period-row-sub">WR ${wr}%</div>
+          </div>
+          <span class="period-arrow">▶</span>
+        </div>
+      </div>
+      <div class="period-row-stats">
+        <span>✅ ${g.wins}W</span>
+        <span>❌ ${g.losses}L</span>
+        ${g.swap>0?'<span style="color:var(--red)">💱 -$'+g.swap.toFixed(2)+' swap</span>':''}
+        ${g.spread>0?'<span style="color:var(--orange)">📏 -$'+g.spread.toFixed(2)+' spread</span>':''}
+      </div>
+      <div class="period-row-detail">
+        <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Por Conta</div>
+        ${acctList.map(function(e){return '<div class="acct-mini"><span class="acct-mini-name">'+e[0]+' <span style="color:var(--muted)">('+e[1].count+')</span></span><span class="acct-mini-val '+(e[1].resultado>=0?'green':'red')+'">'+fmtS(e[1].resultado)+'</span></div>';}).join('')}
+        <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin:10px 0 6px;">Por Ativo</div>
+        ${assetList.map(function(e){return '<div class="acct-mini"><span class="acct-mini-name">'+e[0]+' <span style="color:var(--muted)">('+e[1].count+' ops • '+e[1].lotes.toFixed(2)+' lotes)</span></span><span class="acct-mini-val '+(e[1].resultado>=0?'green':'red')+'">'+fmtS(e[1].resultado)+'</span></div>';}).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function togglePeriodRow(key){
+  var el=document.getElementById('pr-'+key);
+  if(el) el.classList.toggle('expanded');
+}
+
+// ============================================================
+// ARBITRAGEM (pareamento entre contas)
+// ============================================================
+function renderArbitragem(){
+  var pane=document.getElementById('pane-arbitragem'); if(!pane) return;
+
+  if(DB.accounts.length<2){
+    pane.innerHTML='<div class="empty" style="margin-top:40px"><div class="icon">🔗</div>Você precisa de <strong>pelo menos 2 contas</strong> para usar arbitragem.<br>Crie outra conta para começar a parear operações.</div>';
+    return;
+  }
+
+  // Get config or defaults
+  if(!DB.arbConfig) DB.arbConfig={acctA:DB.accounts[0].id,acctB:DB.accounts[1]?DB.accounts[1].id:DB.accounts[0].id,windowMinutes:120};
+
+  var pairs=findArbitragePairs(DB.arbConfig.acctA, DB.arbConfig.acctB, DB.arbConfig.windowMinutes);
+
+  // Stats
+  var totalNet=pairs.reduce(function(s,p){return s+p.netResult;},0);
+  var totalDiff=pairs.reduce(function(s,p){return s+p.spreadDiff;},0);
+  var winsArb=pairs.filter(function(p){return p.netResult>0;}).length;
+  var arbWR=pairs.length>0?(winsArb/pairs.length*100):0;
+
+  var slowCount={};
+  pairs.forEach(function(p){
+    if(p.slowBroker){
+      slowCount[p.slowBroker]=(slowCount[p.slowBroker]||0)+1;
+    }
+  });
+  var worstBroker=Object.entries(slowCount).sort(function(a,b){return b[1]-a[1];})[0];
+
+  pane.innerHTML=`
+    <div class="sync-banner">
+      🔗 <strong>Arbitragem entre Contas:</strong> Cruzamos operações do <strong>mesmo ativo</strong> entre as 2 contas dentro da janela de tempo configurada. Calculamos lucro líquido combinado, slippage e identificamos o broker "slow" (pior execução) para evitar toxic flow.
+    </div>
+
+    <div class="arb-config">
+      <div style="font-size:9px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Configuração do Par</div>
+      <div class="arb-pair-select" style="margin-bottom:8px">
+        <select id="arb-acct-a" onchange="updateArbConfig()">
+          ${DB.accounts.map(function(a){return '<option value="'+a.id+'"'+(a.id===DB.arbConfig.acctA?' selected':'')+'>'+a.nome+'</option>';}).join('')}
+        </select>
+        <span class="arb-arrow">⇄</span>
+        <select id="arb-acct-b" onchange="updateArbConfig()">
+          ${DB.accounts.map(function(a){return '<option value="'+a.id+'"'+(a.id===DB.arbConfig.acctB?' selected':'')+'>'+a.nome+'</option>';}).join('')}
+        </select>
+      </div>
+      <div class="arb-pair-select">
+        <label style="font-size:10px;color:var(--muted2);min-width:90px">Janela (min):</label>
+        <select id="arb-window" onchange="updateArbConfig()">
+          <option value="5"${DB.arbConfig.windowMinutes===5?' selected':''}>5 min</option>
+          <option value="30"${DB.arbConfig.windowMinutes===30?' selected':''}>30 min</option>
+          <option value="60"${DB.arbConfig.windowMinutes===60?' selected':''}>1 hora</option>
+          <option value="120"${DB.arbConfig.windowMinutes===120?' selected':''}>2 horas</option>
+          <option value="360"${DB.arbConfig.windowMinutes===360?' selected':''}>6 horas</option>
+          <option value="1440"${DB.arbConfig.windowMinutes===1440?' selected':''}>24 horas</option>
+        </select>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.5;">
+        💡 Janela maior = mais pares detectados, mas pode incluir trades não relacionados. Use janela menor (5-30min) para arbitragem pura de latência; janelas maiores para hedge intencional anti-toxic.
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi c-${totalNet>=0?'green':'red'}"><div class="kpi-label">Lucro Líquido Pares</div><div class="kpi-val ${totalNet>=0?'green':'red'}">${fmtS(totalNet)}</div><div class="kpi-sub">${pairs.length} pares</div></div>
+      <div class="kpi c-purple"><div class="kpi-label">Win Rate Arb</div><div class="kpi-val purple">${arbWR.toFixed(1)}%</div><div class="kpi-sub">${winsArb}W ${pairs.length-winsArb}L</div></div>
+      <div class="kpi c-yellow"><div class="kpi-label">Diferença Spread</div><div class="kpi-val yellow">$${totalDiff.toFixed(2)}</div><div class="kpi-sub">Custo total spread</div></div>
+      <div class="kpi c-${worstBroker?'red':'blue'}"><div class="kpi-label">Broker Slow</div><div class="kpi-val red" style="font-size:13px">${worstBroker?worstBroker[0].substring(0,12):'—'}</div><div class="kpi-sub">${worstBroker?worstBroker[1]+'x atrasou':'Sem dados'}</div></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">🔗 Pares Detectados</span><span class="sec-badge">${pairs.length}</span></div>
+      <div class="sec-body">
+        ${pairs.length===0?
+          '<div class="empty"><div class="icon">🔍</div>Nenhum par detectado com a configuração atual.<br><span style="font-size:9px">Verifique se as 2 contas têm operações no mesmo ativo dentro da janela de tempo. As operações precisam ter horário (openTime) registrado.</span></div>':
+          pairs.slice(0,30).map(function(p){return renderArbPair(p);}).join('')
+        }
+      </div>
+    </div>
+
+    ${pairs.length>0?'<button class="btn btn-p" onclick="askAIArb()">🤖 PEDIR ANÁLISE IA DA ARBITRAGEM</button>':''}
+  `;
+}
+
+function updateArbConfig(){
+  DB.arbConfig.acctA=document.getElementById('arb-acct-a').value;
+  DB.arbConfig.acctB=document.getElementById('arb-acct-b').value;
+  DB.arbConfig.windowMinutes=parseInt(document.getElementById('arb-window').value);
+  saveDB();
+  renderArbitragem();
+}
+
+function findArbitragePairs(acctIdA, acctIdB, windowMinutes){
+  var a=DB.accounts.find(function(x){return x.id===acctIdA;});
+  var b=DB.accounts.find(function(x){return x.id===acctIdB;});
+  if(!a||!b||a.id===b.id) return [];
+
+  var windowMs=windowMinutes*60*1000;
+  var opsA=a.operacoes.filter(function(o){return o.openTime;}).map(function(o){return Object.assign({},o,{_acctName:a.nome,_acctId:a.id,_openMs:parseTime(o.openTime)});});
+  var opsB=b.operacoes.filter(function(o){return o.openTime;}).map(function(o){return Object.assign({},o,{_acctName:b.nome,_acctId:b.id,_openMs:parseTime(o.openTime)});});
+
+  var pairs=[];
+  var usedB={};
+
+  opsA.forEach(function(oa){
+    // Find closest matching op in B with same asset within window, not yet used
+    var candidates=opsB.filter(function(ob){
+      return !usedB[ob.id] && ob.par===oa.par && Math.abs(ob._openMs-oa._openMs)<=windowMs;
+    });
+    if(candidates.length===0) return;
+    // Take the closest by time
+    candidates.sort(function(x,y){return Math.abs(x._openMs-oa._openMs)-Math.abs(y._openMs-oa._openMs);});
+    var ob=candidates[0];
+    usedB[ob.id]=true;
+
+    var timeDiffSec=Math.abs(ob._openMs-oa._openMs)/1000;
+    var netResult=oa.resultado+ob.resultado;
+    var totalSpread=(oa.spread||0)+(ob.spread||0);
+    var totalSwap=(oa.swap||0)+(ob.swap||0);
+    var spreadDiff=totalSpread+totalSwap;
+
+    // Slippage analysis: who got worse execution?
+    var slowBroker=null;
+    if(oa.slippage!=null&&ob.slippage!=null){
+      if(oa.slippage<ob.slippage) slowBroker=oa._acctName;
+      else if(ob.slippage<oa.slippage) slowBroker=ob._acctName;
+    }else if(oa.resultado<0&&ob.resultado>0&&Math.abs(oa.resultado)>ob.resultado){
+      slowBroker=oa._acctName;
+    }else if(ob.resultado<0&&oa.resultado>0&&Math.abs(ob.resultado)>oa.resultado){
+      slowBroker=ob._acctName;
+    }
+
+    pairs.push({
+      asset:oa.par,
+      timeDiffSec:timeDiffSec,
+      opA:oa, opB:ob,
+      netResult:netResult,
+      spreadDiff:spreadDiff,
+      totalSpread:totalSpread,
+      totalSwap:totalSwap,
+      slowBroker:slowBroker,
+      isHedge:oa.tipo!==ob.tipo
+    });
+  });
+
+  pairs.sort(function(x,y){return y.opA._openMs-x.opA._openMs;});
+  return pairs;
+}
+
+function parseTime(ts){
+  if(!ts) return 0;
+  try{
+    var clean=ts.replace(' ','T');
+    return new Date(clean).getTime()||0;
+  }catch(e){return 0;}
+}
+
+function renderArbPair(p){
+  var timeStr=formatTimeDiff(p.timeDiffSec);
+  var dateA=p.opA.openTime?p.opA.openTime.split(' ')[0]:p.opA.data;
+  var hedgeBadge=p.isHedge?'<span class="pill pill-purple">HEDGE</span>':'<span class="pill pill-blue">MESMO LADO</span>';
+
+  return `
+    <div class="arb-pair-card">
+      <div class="arb-pair-head">
+        <div>
+          <div class="arb-pair-asset">${p.asset} ${hedgeBadge}</div>
+          <div class="arb-pair-time">${dateA} • Δ ${timeStr}</div>
+        </div>
+        <div>
+          <div class="arb-pair-result ${p.netResult>=0?'green':'red'}">${fmtS(p.netResult)}</div>
+          <div class="arb-pair-spread">Custo: $${p.spreadDiff.toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="arb-leg">
+        ${renderArbLeg(p.opA, p.slowBroker===p.opA._acctName)}
+        ${renderArbLeg(p.opB, p.slowBroker===p.opB._acctName)}
+      </div>
+      <div class="arb-metrics">
+        <div class="arb-metric"><div class="arb-metric-label">Spread A</div><div class="arb-metric-val red">$${(p.opA.spread||0).toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Spread B</div><div class="arb-metric-val red">$${(p.opB.spread||0).toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Swap Total</div><div class="arb-metric-val orange">$${p.totalSwap.toFixed(2)}</div></div>
+        <div class="arb-metric"><div class="arb-metric-label">Dur. Média</div><div class="arb-metric-val blue">${formatDurShort(((p.opA.durationSec||0)+(p.opB.durationSec||0))/2)}</div></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderArbLeg(op, isSlow){
+  var typeColor=op.tipo==='BUY'?'tag-buy':'tag-sell';
+  var slipStr='';
+  if(op.slippage!=null) slipStr=' • slip '+(op.slippage>0?'+':'')+op.slippage.toFixed(1)+'p';
+  var brokerTag=isSlow?'<span class="slow-tag">⚠ SLOW</span>':'<span class="fast-tag">✓ FAST</span>';
+  var hora=op.openTime?op.openTime.split(' ')[1]||'':'';
+
+  return `
+    <div class="arb-leg-box">
+      <div class="arb-leg-acct">${op._acctName} ${op.openTime?brokerTag:''}</div>
+      <div><span class="arb-leg-type ${typeColor}">${op.tipo}</span> ${op.lotes.toFixed(2)} lotes</div>
+      <div class="arb-leg-price">${op.entrada||'—'} → ${op.saida||'—'}</div>
+      <div class="arb-leg-result ${op.resultado>=0?'green':'red'}">${fmtS(op.resultado)}</div>
+      <div class="arb-leg-meta">${hora} ${slipStr}</div>
+    </div>
+  `;
+}
+
+function formatTimeDiff(sec){
+  if(sec<60) return Math.round(sec)+'s';
+  if(sec<3600) return Math.floor(sec/60)+'m '+Math.round(sec%60)+'s';
+  var h=Math.floor(sec/3600);
+  return h+'h '+Math.floor((sec%3600)/60)+'m';
+}
+
+function formatDurShort(sec){
+  if(!sec) return '—';
+  if(sec<60) return Math.round(sec)+'s';
+  if(sec<3600) return Math.floor(sec/60)+'m';
+  return Math.floor(sec/3600)+'h';
+}
+
+async function askAIArb(){
+  // Switch to IA tab with prepared question
+  DB.activeTab='ia';
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('pane-ia').classList.add('active');
+  document.querySelectorAll('.bnav').forEach(function(b){
+    b.classList.toggle('active',b.dataset.tab==='ia');
+  });
+  renderIA();
+  setTimeout(function(){
+    quickAsk('Analise meus pares de arbitragem entre as 2 contas configuradas. Qual broker está executando pior? O custo de spread está justificado pelo ganho líquido? Detecte sinais de toxic flow (ex: lucros sempre num lado e prejuízos no outro). Dê veredito objetivo.');
+  },300);
+}
+
+// ============================================================
+// RELATÓRIO (AI PARSE)
+// ============================================================
+function renderRelatorio(){
+  var a=getAcct(); if(!a) return;
+  var pane=document.getElementById('pane-relatorio'); if(!pane) return;
+  pane.innerHTML=`
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">📨 Importar/Atualizar (IA)</span><span class="sec-badge">${a.nome}</span></div>
+      <div class="sec-body">
+        <div class="sync-banner">
+          🤖 <strong>Smart Parser:</strong> Tenta primeiro um parser <strong>local rápido</strong> (sem precisar de IA) para formatos comuns de broker (Bullex, PuPrime, MT4/MT5, cTrader). Se falhar, usa IA. Detecta dedupe por <strong>Ticket ID</strong>, atualiza só campos faltantes, nunca duplica.
+        </div>
+        <div class="report-hint">
+          Cole o relatório COMPLETO (qualquer formato — vertical, tabular, em português ou inglês).<br>
+          Reconhece: <strong>Ticket, Instrumento, Direção (COMPRAR/VENDER), Preços, Lucro/Perda, Hora de abertura/fecho</strong>. Converte GOLD→XAUUSD automaticamente.
+        </div>
+        <div class="fg" style="margin-bottom:10px">
+          <label>Texto do Relatório</label>
+          <textarea id="report-text" placeholder="Cole aqui o relatório completo..."></textarea>
+        </div>
+        <div id="report-preview-wrap" style="display:none">
+          <div class="report-preview" id="report-preview"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-p" onclick="parseReport()" id="btn-parse">🤖 ANALISAR + ATUALIZAR</button>
+          <button class="btn btn-outline" onclick="clearReport()">LIMPAR</button>
+        </div>
+        <div id="parse-status" style="margin-top:10px;font-size:10px;color:var(--muted2);text-align:center;min-height:14px"></div>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Histórico de Sincronizações</span><span class="sec-badge">${a.reports.length}</span></div>
+      <div class="sec-body">
+        ${a.reports.length===0?'<div class="empty"><div class="icon">📨</div>Nenhum relatório importado ainda.</div>':
+        a.reports.slice().reverse().map(function(r){
+          var meta=r.opsAdded+' novas';
+          if(r.opsUpdated) meta+=' • '+r.opsUpdated+' atualizadas';
+          return '<div class="rlog-item"><div class="rlog-head"><span class="rlog-date">'+r.importedAt+'</span><span class="rlog-meta">'+meta+'</span></div><div class="rlog-body">'+r.summary+'</div></div>';
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function clearReport(){
+  document.getElementById('report-text').value='';
+  document.getElementById('report-preview-wrap').style.display='none';
+  document.getElementById('parse-status').textContent='';
+}
+
+// ============================================================
+// LOCAL FALLBACK PARSER (regex-based, sem IA)
+// Funciona com formato vertical estilo Bullex/PuPrime/cTrader em português
+// ============================================================
+function localParseReport(text){
+  var ops=[];
+  // Normalize: replace newlines that separate fields with spaces, but keep "double newlines" as block separators
+  // Strategy: each operation contains "Ticket NNNNN ... Hora de fecho ..." - we look for these blocks
+  // First, glue everything into single-line per block
+  var blocks=[];
+  
+  // Split by "Ticket" keyword to find each operation block (each op has 1 Ticket field)
+  // But preserve the data before the first Ticket
+  var parts=text.split(/\n(?=(?:ID ordem\s+\d+|^\d{9})\s*\n?Ticket)/m);
+  if(parts.length<2){
+    // Try alternative split by Ticket
+    parts=text.split(/(?=Ticket\s+\d+\s*\n)/);
+  }
+  if(parts.length<2){
+    // Last resort: assume one op per block separated by blank lines
+    parts=text.split(/\n\s*\n+/);
+  }
+  
+  parts.forEach(function(block){
+    block=block.replace(/\s+/g,' ').trim();
+    if(!block) return;
+    
+    var ticket=block.match(/Ticket\s+(\d+)/);
+    var instrumento=block.match(/Instrumento\s+(\S+)/);
+    var direcao=block.match(/Direção\s+(COMPRAR|VENDER|BUY|SELL)/i);
+    var quantidade=block.match(/Quantidade\s+([\d.,]+)/);
+    var precoAb=block.match(/Preço de abertura\s+([\d,.]+)/);
+    var precoFc=block.match(/Preço de fecho\s+([\d,.]+)/);
+    var pnl=block.match(/Lucro\/Perda\s+(-?\$?[\d,.]+)/);
+    var motivo=block.match(/Motivo de fecho\s+([^M]+?)(?=\s+Lucro|\s+Swaps|\s+Tipo|$)/);
+    var swap=block.match(/Swaps?\s+(-?\$?[\d,.]+)/);
+    var horaAb=block.match(/Hora de abertura\s+(\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}:\d{2})/);
+    var horaFc=block.match(/Hora de fecho\s+(\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}:\d{2})/);
+    var tpSl=block.match(/Take Profit\/Stop Loss\s+([\d,.]+|\-)\/([\d,.]+|\-)/);
+    
+    if(!ticket||!direcao||!pnl) return;
+    
+    var pnlStr=pnl[1].replace(/[\$,]/g,'');
+    var pnlVal=parseFloat(pnlStr);
+    
+    var dir=direcao[1].toUpperCase();
+    var tipo=(dir==='COMPRAR'||dir==='BUY')?'BUY':'SELL';
+    
+    var instr=instrumento?instrumento[1].toUpperCase():'OUTRO';
+    if(instr==='GOLD') instr='XAUUSD';
+    
+    var openTime=horaAb?parseLocalDateTime(horaAb[1]):null;
+    var closeTime=horaFc?parseLocalDateTime(horaFc[1]):null;
+    var data=openTime?openTime.split(' ')[0]:today();
+    var dur=null;
+    if(openTime&&closeTime){
+      try{
+        var o=new Date(openTime.replace(' ','T'));
+        var c=new Date(closeTime.replace(' ','T'));
+        dur=Math.floor((c-o)/1000);
+      }catch(e){}
+    }
+    
+    var swapVal=0;
+    if(swap){
+      swapVal=Math.abs(parseFloat(swap[1].replace(/[\$,]/g,''))||0);
+    }
+    
+    var entrada=precoAb?precoAb[1].replace(/,/g,''):'';
+    var saida=precoFc?precoFc[1].replace(/,/g,''):'';
+    
+    ops.push({
+      ticketId:ticket[1],
+      par:instr,
+      tipo:tipo,
+      lotes:parseFloat(quantidade?quantidade[1].replace(/,/g,'.'):'0')||0,
+      entrada:entrada,
+      saida:saida,
+      resultado:pnlVal,
+      swap:swapVal,
+      spread:0,
+      slippage:null,
+      data:data,
+      openTime:openTime,
+      closeTime:closeTime,
+      durationSec:dur,
+      closeReason:motivo?motivo[1].trim():''
+    });
+  });
+  
+  return ops;
+}
+
+function parseLocalDateTime(str){
+  // Format: "12/05/26, 11:28:26" or "12/05/2026, 11:28:26"
+  var m=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?\s+(\d{1,2}:\d{2}:\d{2})/);
+  if(!m) return null;
+  var d=m[1].padStart(2,'0');
+  var mo=m[2].padStart(2,'0');
+  var y=m[3].length===2?'20'+m[3]:m[3];
+  return y+'-'+mo+'-'+d+' '+m[4];
+}
+
+async function parseReport(){
+  var a=getAcct(); if(!a) return;
+  var text=document.getElementById('report-text').value.trim();
+  if(!text) return alert('Cole o texto do relatório.');
+  var btn=document.getElementById('btn-parse');
+  var status=document.getElementById('parse-status');
+  btn.disabled=true; btn.textContent='⏳ Analisando...';
+  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Tentando parser local primeiro...';
+
+  // ============= STEP 1: Try LOCAL parser first (fast, no API needed) =============
+  var localOps=[];
+  try{
+    localOps=localParseReport(text);
+  }catch(e){
+    console.warn('Local parser failed:',e);
+  }
+
+  var newCount=0, updateCount=0, updateLog=[];
+  var summary='';
+
+  if(localOps.length>0){
+    status.innerHTML='✅ Parser local extraiu '+localOps.length+' operações. Aplicando...';
+    
+    localOps.forEach(function(op){
+      // Check duplicate by ticketId
+      var existing=a.operacoes.find(function(o){return o.ticketId&&o.ticketId===String(op.ticketId);});
+      if(existing){
+        // Update missing fields
+        Object.keys(op).forEach(function(k){
+          if((existing[k]===undefined||existing[k]===null||existing[k]===''||(k!=='resultado'&&existing[k]===0))&&op[k]){
+            updateLog.push({par:existing.par,field:k,old:existing[k]||'—',new:op[k]});
+            existing[k]=op[k];
+          }
+        });
+        existing.lastUpdated=new Date().toLocaleString('pt-BR');
+        updateCount++;
+      }else{
+        var newOp={
+          id:uid(),
+          ticketId:String(op.ticketId),
+          par:op.par,
+          tipo:op.tipo,
+          lotes:op.lotes,
+          entrada:op.entrada,
+          saida:op.saida,
+          resultado:op.resultado,
+          swap:op.swap,
+          spread:0,
+          slippage:null,
+          data:op.data,
+          openTime:op.openTime,
+          closeTime:op.closeTime,
+          durationSec:op.durationSec,
+          closeReason:op.closeReason,
+          source:'local-parser'
+        };
+        // Auto-calculate spread from config
+        newOp.spread=calculateOpSpread(newOp, a);
+        if(newOp.spread>0) newOp.spreadCalculated=true;
+        a.operacoes.push(newOp);
+        newCount++;
+      }
+    });
+
+    var totalPnl=localOps.reduce(function(s,o){return s+o.resultado;},0);
+    var wins=localOps.filter(function(o){return o.resultado>0;}).length;
+    summary='Parser local: '+localOps.length+' ops processadas (P&L $'+totalPnl.toFixed(2)+', '+wins+'W/'+(localOps.length-wins)+'L)';
+    
+    a.reports.push({
+      id:uid(),
+      importedAt:new Date().toLocaleString('pt-BR'),
+      opsAdded:newCount,
+      opsUpdated:updateCount,
+      totalProfit:totalPnl,
+      summary:summary,
+      raw:text.slice(0,200),
+      method:'local'
+    });
+
+    saveDB();
+    var msg='✅ <span style="color:var(--accent)">'+newCount+' novas</span>';
+    if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
+    msg+=' <span style="color:var(--muted2)">(parser local)</span>';
+    status.innerHTML=msg;
+
+    var previewHtml='✅ Parser local detectou '+localOps.length+' operações:\n\n';
+    previewHtml+=JSON.stringify(localOps.slice(0,5),null,2);
+    if(localOps.length>5) previewHtml+='\n\n... e mais '+(localOps.length-5)+' operações';
+    if(updateLog.length>0){
+      previewHtml+='\n\n--- LOG DE ATUALIZAÇÕES (primeiras 10) ---\n';
+      updateLog.slice(0,10).forEach(function(l){
+        previewHtml+='• '+l.par+' ['+l.field+']: '+l.old+' → '+l.new+'\n';
+      });
+    }
+    document.getElementById('report-preview-wrap').style.display='block';
+    document.getElementById('report-preview').textContent=previewHtml;
+    
+    renderRelatorio();
+    renderDashboard();
+    renderHistorico();
+    renderCustos();
+    toast('🤖 '+newCount+' novas + '+updateCount+' atualizadas');
+    btn.disabled=false; btn.textContent='🤖 ANALISAR + ATUALIZAR';
+    return;
+  }
+
+  // ============= STEP 2: Fallback to AI parser =============
+  status.innerHTML='<div class="typing"><span></span><span></span><span></span></div> Parser local não encontrou padrão. Usando IA...';
+
+  var existingOps=a.operacoes.map(function(o){return {id:o.id,ticketId:o.ticketId,par:o.par,lotes:o.lotes,data:o.data};});
+
+  var systemPrompt=`Você é um parser ESPECIALISTA em relatórios de contas de trading de QUALQUER formato (MT4, MT5, cTrader, Bullex, PuPrime, FBS, Polarium, brokers genéricos).
+
+OPERAÇÕES JÁ EXISTENTES NA BASE (para deduplicação por ticketId):
+${JSON.stringify(existingOps).slice(0,2000)}
+
+Sua tarefa: extrair TODAS as operações do texto, mesmo que esteja em formato VERTICAL (campos em linhas separadas), em PORTUGUÊS ou inglês, com instrumentos como GOLD, XAUUSD, EURUSD, NAS100, US30, BTCUSD.
+
+CAMPOS POSSÍVEIS NO TEXTO (varia por broker):
+- "ID ordem" / "Order ID" / "Deal" — identificador da ordem
+- "Ticket" — número do ticket (USE COMO ticketId)
+- "Instrumento" / "Symbol" — converta GOLD → XAUUSD, SILVER → XAGUSD
+- "Direção" / "Type" / "Side" — COMPRAR=BUY, VENDER=SELL
+- "Quantidade" / "Volume" / "Lots" — pode estar em Troy Ounces, lotes ou contratos
+- "Preço de abertura" / "Open Price" / "Entry"
+- "Preço de fecho" / "Close Price" / "Exit"
+- "Lucro/Perda" / "P&L" / "Profit" — pode ter formato "-$86.84" ou "$30.75"
+- "Swaps" / "Swap"
+- "Motivo de fecho" / "Reason" — Stop out, Manual, Take Profit, Stop Loss
+- "Hora de abertura" / "Open Time" — formato BR pode ser "12/05/26, 11:28:26" (DD/MM/YY)
+- "Hora de fecho" / "Close Time"
+
+RETORNE APENAS JSON puro, sem markdown:
+{
+  "date": "YYYY-MM-DD",
+  "newOperations": [
+    {
+      "ticketId": "217136783",
+      "par": "XAUUSD",
+      "tipo": "BUY",
+      "lotes": 4,
+      "entrada": "4686.38",
+      "saida": "4664.67",
+      "resultado": -86.84,
+      "swap": 0,
+      "spread": 0,
+      "data": "2026-05-12",
+      "openTime": "2026-05-12 11:28:26",
+      "closeTime": "2026-05-12 12:12:11",
+      "durationSec": 2625,
+      "closeReason": "Stop out"
+    }
+  ],
+  "updates": [],
+  "summary": "Resumo em português"
+}
+
+REGRAS CRÍTICAS:
+1. EXTRAIA TODAS as operações, mesmo que sejam dezenas
+2. Datas DD/MM/YY → YYYY-MM-DD (25 = 2025, 26 = 2026)
+3. Lucro/Perda: PRESERVE o sinal negativo se houver "-$"
+4. GOLD = XAUUSD sempre
+5. Se ticketId já existe na base, coloque em "updates" não em "newOperations"
+6. Calcule durationSec subtraindo openTime - closeTime
+7. swap deve ser POSITIVO (custo)`;
+
+  try{
+    var res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:4000,
+        system:systemPrompt,
+        messages:[{role:'user',content:'Extraia TODAS as operações deste relatório:\n\n'+text}]
+      })
+    });
+    var data=await res.json();
+    var raw=data.content&&data.content.map(function(b){return b.text||'';}).join('')||'';
+    var clean=raw.replace(/```json|```/g,'').trim();
+    var jsonMatch=clean.match(/\{[\s\S]*\}/);
+    if(jsonMatch) clean=jsonMatch[0];
+    var parsed=JSON.parse(clean);
+
+    if(parsed.updates&&parsed.updates.length>0){
+      parsed.updates.forEach(function(u){
+        var op=a.operacoes.find(function(o){return o.id===u.matchId||o.ticketId===u.ticketId;});
+        if(op&&u.fields){
+          Object.keys(u.fields).forEach(function(k){
+            if((op[k]===undefined||op[k]===null||op[k]===''||op[k]===0)&&u.fields[k]){
+              updateLog.push({par:op.par,field:k,old:op[k]||'—',new:u.fields[k]});
+              op[k]=u.fields[k];
+            }
+          });
+          updateCount++;
+        }
+      });
+    }
+
+    if(parsed.newOperations&&parsed.newOperations.length>0){
+      parsed.newOperations.forEach(function(op){
+        if(op.ticketId){
+          var existing=a.operacoes.find(function(o){return o.ticketId&&o.ticketId===String(op.ticketId);});
+          if(existing){
+            Object.keys(op).forEach(function(k){
+              if((existing[k]===undefined||existing[k]===null||existing[k]===''||(k!=='resultado'&&existing[k]===0))&&op[k]){
+                existing[k]=op[k];
+              }
+            });
+            updateCount++;
+            return;
+          }
+        }
+        var newOp={
+          id:uid(),
+          ticketId:op.ticketId?String(op.ticketId):null,
+          par:(op.par||'OUTRO').toUpperCase().replace(/[\/\s]/g,''),
+          tipo:(op.tipo||'BUY').toUpperCase(),
+          lotes:parseFloat(op.lotes)||0,
+          entrada:String(op.entrada||''),
+          saida:String(op.saida||''),
+          resultado:parseFloat(op.resultado)||0,
+          swap:Math.abs(parseFloat(op.swap)||0),
+          spread:Math.abs(parseFloat(op.spread)||0),
+          data:op.data||today(),
+          openTime:op.openTime||null,
+          closeTime:op.closeTime||null,
+          durationSec:op.durationSec||null,
+          closeReason:op.closeReason||null,
+          slippage:op.slippage!=null?parseFloat(op.slippage):null,
+          source:'ai-parser'
+        };
+        // Auto-calculate spread if not provided by report
+        if(newOp.spread===0){
+          var calcS=calculateOpSpread(newOp, a);
+          if(calcS>0){
+            newOp.spread=calcS;
+            newOp.spreadCalculated=true;
+          }
+        }
+        a.operacoes.push(newOp);
+        newCount++;
+      });
+    }
+
+    a.reports.push({
+      id:uid(),
+      importedAt:new Date().toLocaleString('pt-BR'),
+      opsAdded:newCount,
+      opsUpdated:updateCount,
+      totalProfit:parsed.totalProfit||0,
+      summary:parsed.summary||'Processado via IA.',
+      raw:text.slice(0,200),
+      method:'ai'
+    });
+
+    saveDB();
+    var msg='✅ <span style="color:var(--accent)">'+newCount+' novas</span>';
+    if(updateCount>0) msg+=' | <span style="color:var(--accent2)">'+updateCount+' atualizadas</span>';
+    msg+=' <span style="color:var(--muted2)">(IA)</span>';
+    status.innerHTML=msg;
+
+    var previewHtml=JSON.stringify(parsed,null,2);
+    document.getElementById('report-preview-wrap').style.display='block';
+    document.getElementById('report-preview').textContent=previewHtml;
+    renderRelatorio();
+    renderDashboard();
+    renderHistorico();
+    renderCustos();
+    toast('🤖 '+newCount+' novas + '+updateCount+' atualizadas');
+
+  }catch(e){
+    console.error(e);
+    status.innerHTML='❌ <span style="color:var(--red)">Erro: '+e.message+'</span><br><span style="color:var(--muted)">Verifique o formato ou tente colar menos operações por vez.</span>';
+  }
+  btn.disabled=false; btn.textContent='🤖 ANALISAR + ATUALIZAR';
+}
+
+// ============================================================
+// HISTÓRICO (com edição)
+// ============================================================
+function renderHistorico(){
+  var a=getAcct(); if(!a) return;
+  var pane=document.getElementById('pane-historico'); if(!pane) return;
+  pane.innerHTML=`
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">📋 Histórico de Operações</span><span class="sec-badge">${a.operacoes.length} ops</span></div>
+      <div class="sec-body" style="padding:0">
+        ${a.operacoes.length===0?'<div class="empty"><div class="icon">📋</div>Nenhuma operação. Use a aba <strong>Relatório</strong> para importar via IA.</div>':
+        '<div style="font-size:10px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border)">💡 Toque em uma linha para editar/excluir</div>'+
+        '<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Hora</th><th>Duração</th><th>Par</th><th>Tipo</th><th>Lotes</th><th>Resultado</th><th>Slip</th><th>Swap</th><th>Spread</th><th>Origem</th></tr></thead><tbody>'+
+        a.operacoes.slice().reverse().map(function(o){
+          var hora=o.openTime?o.openTime.split(' ')[1]||'—':'—';
+          var dur=formatDuration(o.durationSec);
+          var slipStr='—';
+          if(o.slippage!=null){
+            slipStr=(o.slippage>0?'+':'')+o.slippage.toFixed(1)+'p';
+          }
+          return '<tr onclick="openEditOp(\''+o.id+'\')"><td>'+o.data+'</td><td style="color:var(--muted2)">'+hora+'</td><td>'+dur+'</td><td style="font-weight:700;color:var(--text)">'+o.par+'</td><td><span class="tag '+(o.tipo==='BUY'?'tag-buy':'tag-sell')+'">'+o.tipo+'</span></td><td>'+o.lotes.toFixed(2)+'</td><td style="color:'+(o.resultado>=0?'var(--accent)':'var(--red)')+'">'+fmtS(o.resultado)+'</td><td style="color:'+(o.slippage>0?'var(--accent)':(o.slippage<0?'var(--red)':'var(--muted)'))+'">'+slipStr+'</td><td style="color:var(--red)">'+(o.swap>0?'-$'+o.swap.toFixed(2):'—')+'</td><td style="color:var(--orange)">'+(o.spread>0?'-$'+o.spread.toFixed(2):'—')+'</td><td><span class="tag '+(o.source==='report'?'tag-src':'tag-man')+'">'+(o.source==='report'?'IA':'MAN')+'</span></td></tr>';
+        }).join('')+'</tbody></table></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function formatDuration(sec){
+  if(!sec) return '<span style="color:var(--muted)">—</span>';
+  if(sec<60) return '<span class="duration-pill">'+sec+'s</span>';
+  if(sec<3600) return '<span class="duration-pill">'+Math.floor(sec/60)+'m '+(sec%60)+'s</span>';
+  var h=Math.floor(sec/3600);
+  var m=Math.floor((sec%3600)/60);
+  return '<span class="duration-pill">'+h+'h '+m+'m</span>';
+}
+
+function openEditOp(opId){
+  var a=getAcct(); if(!a) return;
+  var op=a.operacoes.find(function(o){return o.id===opId;}); if(!op) return;
+  document.getElementById('eo-id').value=op.id;
+  document.getElementById('eo-par').value=op.par;
+  document.getElementById('eo-tipo').value=op.tipo;
+  document.getElementById('eo-lotes').value=op.lotes;
+  document.getElementById('eo-res').value=op.resultado;
+  document.getElementById('eo-entrada').value=op.entrada||'';
+  document.getElementById('eo-saida').value=op.saida||'';
+  document.getElementById('eo-swap').value=op.swap||0;
+  document.getElementById('eo-spread').value=op.spread||0;
+  document.getElementById('eo-slip').value=op.slippage!=null?op.slippage:'';
+  document.getElementById('eo-ticket').value=op.ticketId||'';
+  document.getElementById('eo-opentime').value=op.openTime||'';
+  document.getElementById('eo-closetime').value=op.closeTime||'';
+  document.getElementById('eo-data').value=op.data;
+  openModal('modal-edit-op');
+}
+
+function saveEditOp(){
+  var a=getAcct(); if(!a) return;
+  var id=document.getElementById('eo-id').value;
+  var op=a.operacoes.find(function(o){return o.id===id;}); if(!op) return;
+  op.par=document.getElementById('eo-par').value.toUpperCase();
+  op.tipo=document.getElementById('eo-tipo').value;
+  op.lotes=parseFloat(document.getElementById('eo-lotes').value)||0;
+  op.resultado=parseFloat(document.getElementById('eo-res').value)||0;
+  op.entrada=document.getElementById('eo-entrada').value;
+  op.saida=document.getElementById('eo-saida').value;
+  op.swap=Math.abs(parseFloat(document.getElementById('eo-swap').value)||0);
+  op.spread=Math.abs(parseFloat(document.getElementById('eo-spread').value)||0);
+  var slip=document.getElementById('eo-slip').value;
+  op.slippage=slip!==''?parseFloat(slip):null;
+  op.ticketId=document.getElementById('eo-ticket').value||null;
+  op.openTime=document.getElementById('eo-opentime').value||null;
+  op.closeTime=document.getElementById('eo-closetime').value||null;
+  // Recompute duration
+  if(op.openTime&&op.closeTime){
+    try{
+      var ot=new Date(op.openTime.replace(' ','T'));
+      var ct=new Date(op.closeTime.replace(' ','T'));
+      op.durationSec=Math.floor((ct-ot)/1000);
+    }catch(e){}
+  }
+  op.data=document.getElementById('eo-data').value;
+  op.edited=true;
+  saveDB();
+  closeModal('modal-edit-op');
+  renderHistorico();
+  renderDashboard();
+  toast('✅ Operação atualizada');
+}
+
+function deleteOp(){
+  if(!confirm('Excluir esta operação?')) return;
+  var a=getAcct(); if(!a) return;
+  var id=document.getElementById('eo-id').value;
+  a.operacoes=a.operacoes.filter(function(o){return o.id!==id;});
+  saveDB();
+  closeModal('modal-edit-op');
+  renderHistorico();
+  renderDashboard();
+  toast('🗑 Operação excluída');
+}
+
+// ============================================================
+// CUSTOS
+// ============================================================
+function renderCustos(){
+  var a=getAcct(); if(!a) return;
+  var pane=document.getElementById('pane-custos'); if(!pane) return;
+  var s=calcStats(a);
+
+  // Breakdown by asset
+  var spreadByAsset={};
+  var swapByAsset={};
+  a.operacoes.forEach(function(o){
+    if(o.spread>0){
+      spreadByAsset[o.par]=(spreadByAsset[o.par]||0)+o.spread;
+    }
+    if(o.swap>0){
+      swapByAsset[o.par]=(swapByAsset[o.par]||0)+o.swap;
+    }
+  });
+
+  var hasSpreadConfig=a.spreadConfig&&Object.keys(a.spreadConfig).length>0;
+  var totalSpreadConfigured=Object.keys(a.spreadConfig||{}).length;
+
+  pane.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi c-red"><div class="kpi-label">Total Custos</div><div class="kpi-val red">$${s.totalCustos.toFixed(2)}</div><div class="kpi-sub">${s.totalRes!==0?Math.abs(s.totalCustos/Math.abs(s.totalRes)*100).toFixed(1)+'% do resultado bruto':'—'}</div></div>
+      <div class="kpi c-yellow"><div class="kpi-label">Spread</div><div class="kpi-val yellow">$${s.totalSpread.toFixed(2)}</div><div class="kpi-sub">${s.totalSpread>0?'Entrada/Saída':'Configure spreads'}</div></div>
+      <div class="kpi c-red"><div class="kpi-label">Swap</div><div class="kpi-val red">$${s.totalSwap.toFixed(2)}</div><div class="kpi-sub">Overnight fees</div></div>
+      <div class="kpi c-blue"><div class="kpi-label">Lucro Real</div><div class="kpi-val ${(s.totalRes-s.totalCustos)>=0?'green':'red'}">${fmtS(s.totalRes-s.totalCustos)}</div><div class="kpi-sub">Bruto - Custos</div></div>
+    </div>
+
+    ${!hasSpreadConfig?'<div style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.3);border-radius:10px;padding:12px;margin-bottom:14px"><div style="font-size:11px;color:var(--orange);font-weight:700;margin-bottom:4px">⚠ Spread não configurado para '+a.corretora+'</div><div style="font-size:10px;color:var(--muted2);line-height:1.5;margin-bottom:8px">Suas operações não estão calculando o custo de spread. Configure agora para ter números reais.</div><button class="btn btn-p" onclick="openSpreadModal(\''+a.id+'\')">📏 CONFIGURAR SPREAD DE '+(a.corretora||'CORRETORA').toUpperCase()+'</button></div>':
+    '<div style="background:rgba(0,255,179,.05);border:1px solid rgba(0,255,179,.2);border-radius:10px;padding:10px 12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;font-size:10px"><span style="color:var(--accent)">✓ '+totalSpreadConfigured+' ativos configurados em '+a.corretora+'</span><button class="btn btn-outline" onclick="openSpreadModal(\''+a.id+'\')" style="width:auto;padding:6px 12px;font-size:10px">⚙ EDITAR</button></div>'}
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Custos por Ativo</span><span class="sec-badge">${Object.keys(spreadByAsset).length}</span></div>
+      <div class="sec-body" style="padding:0">
+        ${Object.keys(spreadByAsset).length===0&&Object.keys(swapByAsset).length===0?
+          '<div class="empty"><div class="icon">📊</div>Nenhum custo de spread/swap detectado nas operações.<br><span style="font-size:9px">Configure spread acima e clique em "Recalcular".</span></div>':
+          '<div class="tbl-wrap"><table><thead><tr><th>Ativo</th><th>Spread Total</th><th>Swap Total</th><th>Total</th></tr></thead><tbody>'+
+          Object.keys(Object.assign({},spreadByAsset,swapByAsset)).sort().map(function(par){
+            var sp=spreadByAsset[par]||0;
+            var sw=swapByAsset[par]||0;
+            return '<tr><td style="font-weight:700;color:var(--text)">'+par+'</td><td style="color:var(--yellow)">$'+sp.toFixed(2)+'</td><td style="color:var(--red)">$'+sw.toFixed(2)+'</td><td style="color:var(--orange);font-weight:700">$'+(sp+sw).toFixed(2)+'</td></tr>';
+          }).join('')+'</tbody></table></div>'}
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Adicionar Custo Manual</span></div>
+      <div class="sec-body">
+        <div class="fgrid">
+          <div class="fg"><label>Tipo</label><select id="c-tipo"><option value="comissao">Comissão</option><option value="spread">Spread Extra</option><option value="swap">Swap Extra</option><option value="outros">Outros</option></select></div>
+          <div class="fg"><label>Valor ($)</label><input type="number" id="c-val" placeholder="5.00" step="0.01"></div>
+          <div class="fg"><label>Par</label><input id="c-par" placeholder="EURUSD"></div>
+          <div class="fg"><label>Data</label><input type="date" id="c-data" value="${today()}"></div>
+        </div>
+        <div class="fg" style="margin-bottom:10px"><label>Observação</label><input id="c-obs" placeholder="Opcional..."></div>
+        <button class="btn btn-g" onclick="addCusto()">+ REGISTRAR</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="sec-title">Histórico Custos Manuais</span></div>
+      <div class="sec-body" style="padding:0">
+        ${a.custos.length===0?'<div class="empty"><div class="icon">💸</div>Nenhum custo manual.</div>':
+        '<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Par</th><th>Valor</th><th>Obs</th></tr></thead><tbody>'+
+        a.custos.slice().reverse().map(function(c){return'<tr><td>'+c.data+'</td><td style="text-transform:capitalize">'+c.tipo+'</td><td>'+(c.par||'—')+'</td><td style="color:var(--red)">-$'+c.valor.toFixed(2)+'</td><td style="color:var(--muted2)">'+(c.obs||'—')+'</td></tr>';}).join('')+'</tbody></table></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function addCusto(){
+  var a=getAcct(); if(!a) return;
+  var v=parseFloat(document.getElementById('c-val').value);
+  if(!v||v<=0) return alert('Valor inválido.');
+  a.custos.push({id:uid(),tipo:document.getElementById('c-tipo').value,valor:v,par:document.getElementById('c-par').value,data:document.getElementById('c-data').value||today(),obs:document.getElementById('c-obs').value||'Manual'});
+  document.getElementById('c-val').value=''; document.getElementById('c-obs').value='';
+  saveDB();
+  renderCustos(); renderDashboard();
+  toast('✅ Custo registrado');
+}
+
+// ============================================================
+// IA
+// ============================================================
+var chatHistory=[];
+
+function renderIA(){
+  var pane=document.getElementById('pane-ia'); if(!pane) return;
+  var title=isGeral()?'🌐 Análise Geral (Todas as Contas)':getAcct().nome;
+  pane.innerHTML=`
+    <div class="sec">
+      <div class="sec-head"><div style="display:flex;align-items:center;gap:8px"><div class="live-dot"></div><span class="sec-title">Analista IA</span></div><span class="sec-badge">${title}</span></div>
+      <div class="sec-body">
+        <div class="chat-wrap" id="chat-msgs">
+          <div class="msg msg-ai">${isGeral()?'Olá! Tenho acesso a <strong>todas as suas contas</strong>. Posso comparar performance, identificar qual conta está rendendo mais, sugerir realocação de capital ou dar um veredito consolidado.':'Olá! Sou seu analista. Tenho acesso completo a esta conta. Peça veredito, análise de custos, gestão de risco ou qualquer dúvida.'}</div>
+        </div>
+        <div class="chat-inp-row">
+          <input class="chat-inp" id="chat-inp" placeholder="Pergunte..." onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="chat-send" onclick="sendChat()">&#10148;</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${isGeral()?
+        '<button class="btn btn-p" onclick="quickAsk(\'Compare todas as minhas contas. Qual está performando melhor e por quê? Devo realocar capital?\')">🏆 COMPARAR CONTAS</button>'+
+        '<button class="btn btn-b" onclick="quickAsk(\'Analise meus pares de arbitragem: lucro líquido, slippage, qual broker está com toxic flow ou execução pior. Detecte sinais de problema.\')">🔗 ANÁLISE ARBITRAGEM</button>'+
+        '<button class="btn btn-outline" onclick="quickAsk(\'Faça um veredito consolidado geral: performance, riscos, ativos campeões e 3 recomendações para escalar.\')">📊 VEREDITO GERAL</button>'
+        :
+        '<button class="btn btn-p" onclick="quickAsk(\'Faça um veredito completo desta conta: performance, pontos fortes, pontos fracos e 3 recomendações.\')">🏆 VEREDITO</button>'+
+        '<button class="btn btn-b" onclick="quickAsk(\'Analise os custos de spread e swap. Estou pagando muito? Qual o impacto no resultado?\')">💸 CUSTOS</button>'+
+        '<button class="btn btn-outline" onclick="quickAsk(\'Como está a gestão de risco? R:R adequado? Devo ajustar lotes?\')">⚠️ RISCO</button>'
+      }
+    </div>
+  `;
+  chatHistory=[];
+}
+
+async function sendChat(){
+  var inp=document.getElementById('chat-inp');
+  var msg=inp.value.trim(); if(!msg) return;
+  inp.value='';
+  appendChat(msg,'user');
+  await callChat(msg);
+}
+
+async function quickAsk(msg){ appendChat(msg,'user'); await callChat(msg); }
+
+function appendChat(text,who){
+  var box=document.getElementById('chat-msgs'); if(!box) return;
+  var div=document.createElement('div');
+  div.className='msg msg-'+who;
+  div.textContent=text;
+  box.appendChild(div); box.scrollTop=box.scrollHeight;
+  return div;
+}
+
+function appendTypingChat(){
+  var box=document.getElementById('chat-msgs'); if(!box) return null;
+  var div=document.createElement('div');
+  div.className='msg msg-ai';
+  div.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
+  box.appendChild(div); box.scrollTop=box.scrollHeight;
+  return div;
+}
+
+async function callChat(userMsg){
+  var typing=appendTypingChat();
+  var system;
+  if(isGeral()){
+    var gs=calcGeralStats();
+    var perAcct=gs.byAcct.map(function(x){return x.acct.nome+': saldo $'+x.stats.saldo.toFixed(2)+', lucro '+x.stats.lucroLiq.toFixed(2)+', WR '+x.stats.wr.toFixed(0)+'%, '+x.stats.count+' ops';}).join(' | ');
+
+    // Include arbitrage data if configured
+    var arbInfo='';
+    if(DB.arbConfig&&DB.accounts.length>=2){
+      var pairs=findArbitragePairs(DB.arbConfig.acctA, DB.arbConfig.acctB, DB.arbConfig.windowMinutes);
+      if(pairs.length>0){
+        var totalNet=pairs.reduce(function(s,p){return s+p.netResult;},0);
+        var slowMap={};
+        pairs.forEach(function(p){if(p.slowBroker) slowMap[p.slowBroker]=(slowMap[p.slowBroker]||0)+1;});
+        var nA=DB.accounts.find(function(x){return x.id===DB.arbConfig.acctA;});
+        var nB=DB.accounts.find(function(x){return x.id===DB.arbConfig.acctB;});
+        arbInfo='\n\nARBITRAGEM ATIVA ('+(nA?nA.nome:'')+' ⇄ '+(nB?nB.nome:'')+', janela '+DB.arbConfig.windowMinutes+'min):\n- '+pairs.length+' pares detectados | Lucro líquido combinado: $'+totalNet.toFixed(2)+'\n- Broker slow: '+(Object.entries(slowMap).sort(function(a,b){return b[1]-a[1];})[0]||['nenhum',0]).join(' (')+'x)\n- Últimos 3 pares: '+JSON.stringify(pairs.slice(0,3).map(function(p){return {asset:p.asset,timeDiff:p.timeDiffSec+'s',netResult:p.netResult,slow:p.slowBroker};}));
+      }
+    }
+
+    system='Você é um analista de portfólio Forex especialista em ARBITRAGEM e gestão multi-conta. Dados CONSOLIDADOS:\n- '+DB.accounts.length+' contas | Saldo total: $'+gs.saldo.toFixed(2)+'\n- Capital: $'+gs.totalDep.toFixed(2)+' | Lucro: $'+gs.totalRes.toFixed(2)+' (ROI '+gs.roi.toFixed(2)+'%)\n- Total ops: '+gs.totalOps+' | WR: '+gs.wr.toFixed(1)+'%\n- Lotes: '+gs.totalLotes.toFixed(2)+' | Custos: $'+gs.totalCustos.toFixed(2)+'\n- Contas: '+perAcct+'\n- Top ativos: '+Object.entries(gs.byAsset).sort(function(a,b){return b[1].res-a[1].res;}).slice(0,5).map(function(e){return e[0]+'($'+e[1].res.toFixed(2)+')';}).join(', ')+arbInfo+'\n\nResponda em português, direto, com dados concretos. Conhece bem latency arbitrage, toxic flow, B-book vs A-book. Máx 10 linhas. Emojis moderados.';
+  }else{
+    var a=getAcct(); var s=calcStats(a);
+    system='Você é um analista especialista em Forex.\n\nConta "'+a.nome+'" ('+(a.corretora||'')+'):\n- Depósito: $'+s.totalDep.toFixed(2)+' | Saldo: $'+s.saldo.toFixed(2)+'\n- Lucro: $'+s.lucroLiq.toFixed(2)+' (ROI '+s.roi.toFixed(2)+'%)\n- '+s.count+' ops | W:'+s.wins+' L:'+s.losses+' | WR '+s.wr.toFixed(1)+'%\n- R:R '+s.rr.toFixed(2)+' | Avg Win $'+s.avgWin.toFixed(2)+' | Avg Loss $'+Math.abs(s.avgLoss).toFixed(2)+'\n- Lotes: '+s.totalLotes.toFixed(2)+' | Custos: $'+s.totalCustos.toFixed(2)+' (Swap $'+s.totalSwap.toFixed(2)+' + Spread $'+s.totalSpread.toFixed(2)+')\n- Por ativo: '+Object.entries(s.byAsset).map(function(e){return e[0]+'('+e[1].count+'ops/$'+e[1].res.toFixed(2)+')';}).join(', ')+'\n- Últimas 5 ops: '+JSON.stringify(a.operacoes.slice(-5))+'\n\nResponda em português, direto, profissional. Máx 8 linhas.';
+  }
+
+  chatHistory.push({role:'user',content:userMsg});
+
+  try{
+    var res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,system:system,messages:chatHistory})
+    });
+    var data=await res.json();
+    var text=data.content&&data.content.map(function(b){return b.text||'';}).join('')||'Erro.';
+    if(typing){typing.innerHTML='';typing.textContent=text;}
+    chatHistory.push({role:'assistant',content:text});
+    var box=document.getElementById('chat-msgs');
+    if(box) box.scrollTop=box.scrollHeight;
+  }catch(e){
+    if(typing) typing.textContent='Erro de conexão com a IA.';
+  }
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(m){
+  m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});
+});
+
+document.getElementById('auto-bk')&&document.getElementById('auto-bk').addEventListener('change',function(e){
+  DB.autoBackup=e.target.value; saveDB();
+  toast(DB.autoBackup==='on'?'🔔 Auto-backup ativado':'Auto-backup desativado');
+});
+
+// ============================================================
+// INIT
+// ============================================================
+loadDB();
+renderAcctBar();
+if(DB.accounts.length>0){
+  if(!DB.activeAcct||(DB.activeAcct!=='__GERAL__'&&!getAcct())) DB.activeAcct=DB.accounts[0].id;
+  selectAccount(DB.activeAcct);
+}else{
+  renderMain();
+}
+checkAutoBackup();
+</script>
+</body>
+</html>
